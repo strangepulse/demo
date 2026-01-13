@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Oaken Tower PvP</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    .animate-bounce { animation: bounce 1s infinite; }
+  </style>
+</head>
+<body class="bg-stone-950">
+  <div id="root"></div>
+  
+  <script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+const ITEMS = [
+  { name: "Voidspike", damage: 18, cooldown: 2.7, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Arcane", cost: 25, ability: "When you apply a debuff, gain +2 bonus damage.", icon: "🔱" },
+  { name: "Arcane Mace", damage: 10, cooldown: 3.2, critChance: 0, multicast: 0, poison: 1, burn: 3, bleed: 0, block: 0, healing: 0, tags: "Mace", pack: "Arcane", cost: 25, ability: null, icon: "🔨" },
+  { name: "Ruby Knife", damage: 5, cooldown: 3.3, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 2, block: 0, healing: 0, tags: "Dagger", pack: "Crystal", cost: 30, ability: null, icon: "🗡️" },
+  { name: "Snowflakes", damage: 8, cooldown: 2.4, critChance: 50, multicast: 0, poison: 0, burn: 0, bleed: 2, block: 0, healing: 0, tags: "Magic", pack: "Frosty", cost: 25, ability: null, icon: "❄️" },
+  { name: "Twilight's Edge", damage: 45, cooldown: 5.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Sword", pack: "Dark", cost: 25, ability: "Start of Combat: Permanently gain +7 damage.", icon: "⚔️" },
+  { name: "Sharpsteel", damage: 20, cooldown: 3.2, critChance: 30, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Dagger", pack: "Neutral", cost: 30, ability: "When this crits, permanently gain +1 damage.", icon: "🔪" },
+  { name: "Elven Shield", damage: 0, cooldown: 3.4, critChance: 0, multicast: 0, poison: 2, burn: 0, bleed: 0, block: 30, healing: 0, tags: "Shield", pack: "Elven", cost: 30, ability: null, icon: "🛡️" },
+  { name: "Petal Staff", damage: 0, cooldown: 4.1, critChance: 0, multicast: 0, poison: 2, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Magic", pack: "Elven", cost: 35, ability: "On First 2 Triggers: Permanently gain +1 poison.", icon: "🌸" },
+  { name: "Refined Spear", damage: 15, cooldown: 2.3, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Elven", cost: 15, ability: null, icon: "🏹" },
+  { name: "Flare", damage: 0, cooldown: 4.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Artifact", pack: "Flame", cost: 25, ability: "On Trigger: Give your burn items +1 bonus burn.", icon: "🔥" },
+  { name: "Wildfire", damage: 0, cooldown: 3.7, critChance: 0, multicast: 0, poison: 0, burn: 5, bleed: 0, block: 0, healing: 0, tags: "Magic", pack: "Flame", cost: 25, ability: null, icon: "🌋" },
+  { name: "Icy Axe", damage: 25, cooldown: 3.8, critChance: 50, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Axe", pack: "Frosty", cost: 20, ability: null, icon: "🪓" },
+  { name: "Healing Word", damage: 0, cooldown: 3.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 10, tags: "Magic", pack: "Holy", cost: 25, ability: "On Trigger: Gain +3 bonus heal.", icon: "✨" },
+  { name: "Paladin's Hammer", damage: 8, cooldown: 2.6, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 20, tags: "Mace", pack: "Holy", cost: 25, ability: "On Trigger: If you have 25+ of a debuff, cleanse 5 of it.", icon: "⚒️" },
+  { name: "Divine Axe", damage: 10, cooldown: 3.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 15, tags: "Axe", pack: "Holy", cost: 25, ability: "Every 3 Triggers: Cleanse 5 of each debuff.", icon: "🪓" },
+  { name: "Moon Knife", damage: 15, cooldown: 2.2, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Dagger", pack: "Moon", cost: 30, ability: null, icon: "🌙" },
+  { name: "Silver Lance", damage: 10, cooldown: 2.5, critChance: 0, multicast: 1, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Moon", cost: 20, ability: null, icon: "🗡️" },
+  { name: "Chopper", damage: 15, cooldown: 3.4, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Axe", pack: "Neutral", cost: 25, ability: "Start of Combat: Give your axes +4 damage permanently.", icon: "🪓" },
+  { name: "Bone Club", damage: 25, cooldown: 3.2, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Mace", pack: "Neutral", cost: 15, ability: null, icon: "🦴" },
+  { name: "Novice Blade", damage: 15, cooldown: 2.6, critChance: 30, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Sword", pack: "Neutral", cost: 15, ability: null, icon: "⚔️" },
+  { name: "Regular Bow", damage: 7, cooldown: 3.0, critChance: 30, multicast: 1, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Bow", pack: "Neutral", cost: 15, ability: null, icon: "🏹" },
+  { name: "Sturdy Shield", damage: 0, cooldown: 3.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 30, healing: 0, tags: "Shield", pack: "Neutral", cost: 20, ability: null, icon: "🛡️" },
+  { name: "Spyglass", damage: 0, cooldown: 7.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Artifact", pack: "Neutral", cost: 30, ability: "On Trigger: Give adjacent items +5% crit chance permanently.", icon: "🔭" },
+  { name: "Nugget", damage: 0, cooldown: 2.9, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 20, healing: 0, tags: "Shield", pack: "Neutral", cost: 30, ability: "Every 3 Triggers: Gain +3 gold.", icon: "💰" },
+  { name: "Arcane Cleaver", damage: 10, cooldown: 3.7, critChance: 0, multicast: 0, poison: 2, burn: 4, bleed: 1, block: 0, healing: 0, tags: "Axe", pack: "Arcane", cost: 30, ability: null, icon: "🪓" },
+  { name: "Amethyst Bow", damage: 8, cooldown: 3.9, critChance: 0, multicast: 1, poison: 0, burn: 0, bleed: 1, block: 0, healing: 0, tags: "Bow", pack: "Crystal", cost: 35, ability: null, icon: "🏹" },
+  { name: "Poison Dagger", damage: 8, cooldown: 2.9, critChance: 0, multicast: 0, poison: 3, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Dagger", pack: "Elven", cost: 35, ability: null, icon: "🗡️" },
+  { name: "Dusk Shield", damage: 0, cooldown: 2.6, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 25, healing: 0, tags: "Shield", pack: "Dark", cost: 30, ability: "Start of Combat: Shield for 100.", icon: "🛡️" },
+  { name: "Trident", damage: 15, cooldown: 2.2, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Dark", cost: 30, ability: "Start of Combat: Apply 5 bleed.", icon: "🔱" },
+  { name: "Eclipse", damage: 20, cooldown: 2.6, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Dagger", pack: "Dark", cost: 35, ability: "Start of Combat: Permanently gain +4 damage per dark item.", icon: "🌑" },
+  { name: "Molten Bow", damage: 5, cooldown: 4.0, critChance: 0, multicast: 1, poison: 0, burn: 3, bleed: 0, block: 0, healing: 0, tags: "Bow", pack: "Flame", cost: 35, ability: null, icon: "🔥" },
+  { name: "Coldshot", damage: 5, cooldown: 3.0, critChance: 50, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Bow", pack: "Frosty", cost: 35, ability: "When another frosty item triggers, trigger this.", icon: "❄️" },
+  { name: "Ice Spear", damage: 20, cooldown: 2.4, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Frosty", cost: 25, ability: "On Trigger: Permanently gain +2% crit chance.", icon: "🧊" },
+  { name: "Healer's Oath", damage: 15, cooldown: 2.9, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Mace", pack: "Holy", cost: 40, ability: "When another item heals, trigger this.", icon: "💫" },
+  { name: "Lightblade", damage: 10, cooldown: 3.3, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 45, tags: "Sword", pack: "Holy", cost: 35, ability: null, icon: "⚔️" },
+  { name: "Crescentshot", damage: 8, cooldown: 3.4, critChance: 0, multicast: 3, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Bow", pack: "Moon", cost: 25, ability: null, icon: "🌙" },
+  { name: "Hunter's Tome", damage: 20, cooldown: 3.0, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Magic", pack: "Neutral", cost: 30, ability: "On Trigger: Permanently gain +1 damage.", icon: "📖" },
+  { name: "Spikey Mace", damage: 30, cooldown: 3.2, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Mace", pack: "Neutral", cost: 35, ability: "Start of Combat: Permanently gain +5 damage per mace.", icon: "🔨" },
+  { name: "Noble Spear", damage: 50, cooldown: 3.9, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 0, healing: 0, tags: "Spear", pack: "Neutral", cost: 25, ability: null, icon: "🏹" },
+  { name: "Bulwark", damage: 0, cooldown: 3.6, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 20, healing: 0, tags: "Shield", pack: "Neutral", cost: 35, ability: "On Trigger: Permanently gain +1 shield.", icon: "🛡️" },
+  { name: "Lifeguard", damage: 0, cooldown: 2.9, critChance: 0, multicast: 0, poison: 0, burn: 0, bleed: 0, block: 25, healing: 0, tags: "Shield", pack: "Neutral", cost: 30, ability: "On Trigger: Cleanse 2 of each debuff", icon: "🛡️" },
+];
+
+const PACK_COLORS = {
+  Arcane: { bg: 'from-purple-900 to-indigo-900', border: 'border-purple-500', text: 'text-purple-300', glow: 'shadow-purple-500/50' },
+  Crystal: { bg: 'from-pink-900 to-red-900', border: 'border-pink-500', text: 'text-pink-300', glow: 'shadow-pink-500/50' },
+  Dark: { bg: 'from-gray-900 to-slate-900', border: 'border-gray-500', text: 'text-gray-300', glow: 'shadow-gray-500/50' },
+  Elven: { bg: 'from-emerald-900 to-green-900', border: 'border-emerald-500', text: 'text-emerald-300', glow: 'shadow-emerald-500/50' },
+  Flame: { bg: 'from-orange-900 to-red-900', border: 'border-orange-500', text: 'text-orange-300', glow: 'shadow-orange-500/50' },
+  Frosty: { bg: 'from-cyan-900 to-blue-900', border: 'border-cyan-500', text: 'text-cyan-300', glow: 'shadow-cyan-500/50' },
+  Holy: { bg: 'from-yellow-900 to-amber-900', border: 'border-yellow-500', text: 'text-yellow-300', glow: 'shadow-yellow-500/50' },
+  Moon: { bg: 'from-indigo-900 to-violet-900', border: 'border-indigo-400', text: 'text-indigo-300', glow: 'shadow-indigo-500/50' },
+  Neutral: { bg: 'from-stone-800 to-stone-900', border: 'border-stone-500', text: 'text-stone-300', glow: 'shadow-stone-500/50' },
+};
+
+const BASE_HP = 500;
+const WINS_NEEDED = 3;
+const MERGE_BONUS = 0.80;
+const PICKS_PER_ROUND = 3;
+const STARTING_GOLD = 55;
+const GOLD_PER_ROUND = 45;
+const OVERTIME_START = 20;
+const OVERTIME_DAMAGE = 40;
+const TURN_TIME_LIMIT = 60;
+
+function OakenTowerPvP() {
+  const [gameState, setGameState] = useState('menu');
+  const [gameMode, setGameMode] = useState('samePool');
+  const [player1Slots, setPlayer1Slots] = useState([null, null, null]);
+  const [player2Slots, setPlayer2Slots] = useState([null, null, null]);
+  const [player1SideDeck, setPlayer1SideDeck] = useState([null, null, null]);
+  const [player2SideDeck, setPlayer2SideDeck] = useState([null, null, null]);
+  const [currentTurn, setCurrentTurn] = useState(1);
+  const [player1PicksThisRound, setPlayer1PicksThisRound] = useState(0);
+  const [player2PicksThisRound, setPlayer2PicksThisRound] = useState(0);
+  const [roundNumber, setRoundNumber] = useState(1);
+  const [player1Gold, setPlayer1Gold] = useState(STARTING_GOLD);
+  const [player2Gold, setPlayer2Gold] = useState(STARTING_GOLD);
+  const [player1Pool, setPlayer1Pool] = useState([]);
+  const [player2Pool, setPlayer2Pool] = useState([]);
+  const [turnTimer, setTurnTimer] = useState(TURN_TIME_LIMIT);
+  const [player1FinishedTurn, setPlayer1FinishedTurn] = useState(false);
+  const [player2FinishedTurn, setPlayer2FinishedTurn] = useState(false);
+  const [player1HP, setPlayer1HP] = useState(BASE_HP);
+  const [player2HP, setPlayer2HP] = useState(BASE_HP);
+  const [player1Shield, setPlayer1Shield] = useState(0);
+  const [player2Shield, setPlayer2Shield] = useState(0);
+  const [player1Debuffs, setPlayer1Debuffs] = useState({ poison: 0, burn: 0, bleed: 0 });
+  const [player2Debuffs, setPlayer2Debuffs] = useState({ poison: 0, burn: 0, bleed: 0 });
+  const [player1Wins, setPlayer1Wins] = useState(0);
+  const [player2Wins, setPlayer2Wins] = useState(0);
+  const [lastRoundLoser, setLastRoundLoser] = useState(1);
+  const [battleLog, setBattleLog] = useState([]);
+  const [itemCooldowns, setItemCooldowns] = useState({ p1: [0, 0, 0], p2: [0, 0, 0] });
+  const [battleTime, setBattleTime] = useState(0);
+  const [availableItems, setAvailableItems] = useState([]);
+  const [hoveredItem, setHoveredItem] = useState(null);
+  const [animations, setAnimations] = useState({ p1: [false, false, false], p2: [false, false, false] });
+  const [mergeAnimation, setMergeAnimation] = useState(null);
+  const [selectedSlot, setSelectedSlot] = useState(null);
+  const logRef = useRef(null);
+  const battleStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
+  }, [battleLog]);
+
+  useEffect(() => {
+    if (gameMode === 'samePool' && gameState === 'draft' && 
+        player1PicksThisRound >= PICKS_PER_ROUND && player2PicksThisRound >= PICKS_PER_ROUND &&
+        !battleStartedRef.current) {
+      battleStartedRef.current = true;
+      setTimeout(() => { startBattle(); battleStartedRef.current = false; }, 500);
+    }
+  }, [gameState, gameMode, player1PicksThisRound, player2PicksThisRound]);
+
+  useEffect(() => {
+    if (gameMode !== 'singlePool' || gameState !== 'draft' || player1FinishedTurn) return;
+    const interval = setInterval(() => {
+      setTurnTimer(prev => {
+        if (prev <= 1) { finishPlayerTurn(); return TURN_TIME_LIMIT; }
+        return prev - 1;
+      });
+    }, 300);
+    return () => clearInterval(interval);
+  }, [gameMode, gameState, player1FinishedTurn]);
+
+  const mergeItem = (existingItem, newItem) => {
+    const newMergeLevel = (existingItem.mergeLevel || 0) + 1;
+    const multiplier = 1 + (MERGE_BONUS * newMergeLevel);
+    return {
+      ...existingItem, mergeLevel: newMergeLevel,
+      damage: Math.round(newItem.damage * multiplier),
+      block: Math.round(newItem.block * multiplier),
+      healing: Math.round(newItem.healing * multiplier),
+    };
+  };
+
+  const computeBotPicks = (pool, gold, slots, sideDeck) => {
+    let currentGold = gold, currentPool = [...pool], newSlots = [...slots], newSideDeck = [...sideDeck];
+    let keepPicking = true;
+    while (keepPicking) {
+      const affordableItems = currentPool.filter(i => i.cost <= currentGold);
+      const hasSpace = newSlots.some(s => s === null) || newSideDeck.some(s => s === null);
+      if (affordableItems.length === 0) { keepPicking = false; continue; }
+      let selectedItem = null;
+      for (const slot of [...newSlots, ...newSideDeck]) {
+        if (slot && (slot.mergeLevel || 0) === 0) {
+          const mergeCandidate = affordableItems.find(i => i.name === slot.name);
+          if (mergeCandidate) { selectedItem = mergeCandidate; break; }
+        }
+      }
+      if (!selectedItem && !hasSpace) { keepPicking = false; continue; }
+      if (!selectedItem && hasSpace) {
+        selectedItem = [...affordableItems].sort((a, b) => 
+          ((b.damage || 0) + (b.block || 0) + (b.healing || 0)) - ((a.damage || 0) + (a.block || 0) + (a.healing || 0))
+        )[0];
+      }
+      if (!selectedItem) { keepPicking = false; continue; }
+      currentGold -= selectedItem.cost;
+      const existingSlotIdx = newSlots.findIndex(s => s && s.name === selectedItem.name && (s.mergeLevel || 0) === 0);
+      const existingSideDeckIdx = newSideDeck.findIndex(s => s && s.name === selectedItem.name && (s.mergeLevel || 0) === 0);
+      if (existingSlotIdx !== -1) newSlots[existingSlotIdx] = mergeItem(newSlots[existingSlotIdx], selectedItem);
+      else if (existingSideDeckIdx !== -1) newSideDeck[existingSideDeckIdx] = mergeItem(newSideDeck[existingSideDeckIdx], selectedItem);
+      else {
+        const emptySlot = newSlots.findIndex(s => s === null);
+        if (emptySlot !== -1) newSlots[emptySlot] = { ...selectedItem, mergeLevel: 0 };
+        else {
+          const emptySide = newSideDeck.findIndex(s => s === null);
+          if (emptySide !== -1) newSideDeck[emptySide] = { ...selectedItem, mergeLevel: 0 };
+        }
+      }
+      const idx = currentPool.findIndex(i => i.name === selectedItem.name);
+      if (idx !== -1) currentPool.splice(idx, 1);
+    }
+    return { gold: currentGold, slots: newSlots, sideDeck: newSideDeck, pool: currentPool };
+  };
+
+  const shuffleItems = (mode) => {
+    if (mode === 'singlePool') {
+      const pool1 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      const pool2 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      setPlayer1Pool(pool1); setPlayer2Pool(pool2); setAvailableItems([]);
+    } else {
+      const pool = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      setAvailableItems(pool); setPlayer1Pool([]); setPlayer2Pool([]);
+    }
+  };
+
+  const startGame = (mode) => {
+    setGameMode(mode); setGameState('draft');
+    setPlayer1Slots([null, null, null]); setPlayer1SideDeck([null, null, null]);
+    setCurrentTurn(1); setPlayer1PicksThisRound(0); setPlayer2PicksThisRound(0);
+    setRoundNumber(1); setPlayer1Wins(0); setPlayer2Wins(0);
+    setPlayer1Gold(STARTING_GOLD); setPlayer1FinishedTurn(false); setPlayer2FinishedTurn(false);
+    setTurnTimer(TURN_TIME_LIMIT);
+    if (mode === 'singlePool') {
+      const pool1 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      const pool2 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      setPlayer1Pool(pool1); setAvailableItems([]);
+      const botResult = computeBotPicks(pool2, STARTING_GOLD, [null, null, null], [null, null, null]);
+      setPlayer2Gold(botResult.gold); setPlayer2Slots(botResult.slots);
+      setPlayer2SideDeck(botResult.sideDeck); setPlayer2Pool(botResult.pool); setPlayer2FinishedTurn(true);
+    } else {
+      setPlayer2Slots([null, null, null]); setPlayer2SideDeck([null, null, null]);
+      setPlayer2Gold(STARTING_GOLD); shuffleItems(mode);
+    }
+  };
+
+  const playerSelectItem = (item) => {
+    if (gameMode === 'samePool' && (currentTurn !== 1 || player1PicksThisRound >= PICKS_PER_ROUND)) return;
+    if (gameMode === 'singlePool' && player1FinishedTurn) return;
+    if (player1Gold < item.cost) return;
+    const existingSlotIdx = player1Slots.findIndex(s => s && s.name === item.name && (s.mergeLevel || 0) === 0);
+    const existingSideDeckIdx = player1SideDeck.findIndex(s => s && s.name === item.name && (s.mergeLevel || 0) === 0);
+    if (existingSlotIdx !== -1) {
+      const newSlots = [...player1Slots];
+      newSlots[existingSlotIdx] = mergeItem(player1Slots[existingSlotIdx], item);
+      setPlayer1Slots(newSlots); setMergeAnimation(existingSlotIdx);
+      setTimeout(() => setMergeAnimation(null), 600);
+    } else if (existingSideDeckIdx !== -1) {
+      const newSideDeck = [...player1SideDeck];
+      newSideDeck[existingSideDeckIdx] = mergeItem(player1SideDeck[existingSideDeckIdx], item);
+      setPlayer1SideDeck(newSideDeck); setMergeAnimation(`side-${existingSideDeckIdx}`);
+      setTimeout(() => setMergeAnimation(null), 600);
+    } else {
+      const emptySlot = player1Slots.findIndex(s => s === null);
+      if (emptySlot !== -1) {
+        const newSlots = [...player1Slots]; newSlots[emptySlot] = { ...item, mergeLevel: 0 };
+        setPlayer1Slots(newSlots);
+      } else {
+        const emptySide = player1SideDeck.findIndex(s => s === null);
+        if (emptySide !== -1) {
+          const newSideDeck = [...player1SideDeck]; newSideDeck[emptySide] = { ...item, mergeLevel: 0 };
+          setPlayer1SideDeck(newSideDeck);
+        } else return;
+      }
+    }
+    setPlayer1Gold(prev => prev - item.cost);
+    if (gameMode === 'singlePool') {
+      setPlayer1Pool(prev => { const idx = prev.findIndex(i => i.name === item.name); if (idx !== -1) { const n = [...prev]; n.splice(idx, 1); return n; } return prev; });
+    } else {
+      const newP1Picks = player1PicksThisRound + 1;
+      setPlayer1PicksThisRound(newP1Picks);
+      setAvailableItems(prev => {
+        const idx = prev.findIndex(i => i.name === item.name);
+        if (idx !== -1) {
+          const newItems = [...prev]; newItems.splice(idx, 1);
+          if (newP1Picks >= PICKS_PER_ROUND && player2PicksThisRound >= PICKS_PER_ROUND) setTimeout(() => startBattle(), 500);
+          else if (player2PicksThisRound < PICKS_PER_ROUND) { setCurrentTurn(2); setTimeout(() => botSelectOneItem(newP1Picks, newItems), 300); }
+          return newItems;
+        }
+        return prev;
+      });
+    }
+  };
+
+  const removeItemFromSlot = (idx) => { if (gameState !== 'draft') return; const n = [...player1Slots]; n[idx] = null; setPlayer1Slots(n); };
+  const removeItemFromSideDeck = (idx) => { if (gameState !== 'draft') return; const n = [...player1SideDeck]; n[idx] = null; setPlayer1SideDeck(n); };
+
+  const handleSlotTap = (type, index) => {
+    if (gameState !== 'draft') return;
+    const tappedArray = type === 'tower' ? player1Slots : player1SideDeck;
+    const tappedItem = tappedArray[index];
+    if (!selectedSlot) { if (tappedItem) setSelectedSlot({ type, index }); return; }
+    if (selectedSlot.type === type && selectedSlot.index === index) { setSelectedSlot(null); return; }
+    const sourceArray = selectedSlot.type === 'tower' ? player1Slots : player1SideDeck;
+    const sourceItem = sourceArray[selectedSlot.index];
+    const setSourceArray = selectedSlot.type === 'tower' ? setPlayer1Slots : setPlayer1SideDeck;
+    const setTargetArray = type === 'tower' ? setPlayer1Slots : setPlayer1SideDeck;
+    if (tappedItem && tappedItem.name === sourceItem.name && (tappedItem.mergeLevel || 0) === (sourceItem.mergeLevel || 0)) {
+      const mergedItem = mergeItem(tappedItem, sourceItem);
+      if (selectedSlot.type === type) {
+        const newArray = [...sourceArray]; newArray[index] = mergedItem; newArray[selectedSlot.index] = null;
+        setSourceArray(newArray);
+      } else {
+        const newSourceArray = [...sourceArray]; const newTargetArray = [...tappedArray];
+        newTargetArray[index] = mergedItem; newSourceArray[selectedSlot.index] = null;
+        setSourceArray(newSourceArray); setTargetArray(newTargetArray);
+      }
+      const animKey = type === 'tower' ? index : `side-${index}`;
+      setMergeAnimation(animKey); setTimeout(() => setMergeAnimation(null), 600);
+    } else {
+      if (selectedSlot.type === type) {
+        const newArray = [...sourceArray]; newArray[selectedSlot.index] = tappedItem; newArray[index] = sourceItem;
+        setSourceArray(newArray);
+      } else {
+        const newSourceArray = [...sourceArray]; const newTargetArray = [...tappedArray];
+        newSourceArray[selectedSlot.index] = tappedItem; newTargetArray[index] = sourceItem;
+        setSourceArray(newSourceArray); setTargetArray(newTargetArray);
+      }
+    }
+    setSelectedSlot(null);
+  };
+
+  const finishPlayerTurn = () => {
+    if (gameMode === 'singlePool') { setPlayer1FinishedTurn(true); setTimeout(() => startBattle(), 500); }
+    else {
+      setPlayer1PicksThisRound(PICKS_PER_ROUND);
+      if (player2PicksThisRound >= PICKS_PER_ROUND) setTimeout(() => startBattle(), 500);
+      else { setCurrentTurn(2); setTimeout(() => botSelectOneItem(PICKS_PER_ROUND, availableItems), 300); }
+    }
+  };
+
+  const botSelectOneItem = (currentP1Picks, currentAvailableItems, currentGold = null, currentBotPicks = null) => {
+    const botPicks = currentBotPicks !== null ? currentBotPicks : player2PicksThisRound;
+    if (botPicks >= PICKS_PER_ROUND) { setCurrentTurn(1); return; }
+    setTimeout(() => {
+      const itemsToChooseFrom = currentAvailableItems || availableItems;
+      const gold = currentGold !== null ? currentGold : player2Gold;
+      const affordableItems = itemsToChooseFrom.filter(i => i.cost <= gold);
+      const hasSpace = player2Slots.some(s => s === null) || player2SideDeck.some(s => s === null);
+      if (affordableItems.length === 0) {
+        const newP2Picks = botPicks + 1; setPlayer2PicksThisRound(newP2Picks);
+        if (currentP1Picks >= PICKS_PER_ROUND && newP2Picks >= PICKS_PER_ROUND) setTimeout(() => startBattle(), 500);
+        else if (newP2Picks < PICKS_PER_ROUND && currentP1Picks >= PICKS_PER_ROUND) setTimeout(() => botSelectOneItem(currentP1Picks, itemsToChooseFrom, gold, newP2Picks), 300);
+        else setCurrentTurn(1);
+        return;
+      }
+      let selectedItem = null;
+      for (const slot of [...player2Slots, ...player2SideDeck]) {
+        if (slot && (slot.mergeLevel || 0) === 0) { const m = affordableItems.find(i => i.name === slot.name); if (m) { selectedItem = m; break; } }
+      }
+      if (!selectedItem && hasSpace) selectedItem = [...affordableItems].sort((a, b) => ((b.damage||0)+(b.block||0)+(b.healing||0)) - ((a.damage||0)+(a.block||0)+(a.healing||0)))[0];
+      if (!selectedItem) {
+        const newP2Picks = botPicks + 1; setPlayer2PicksThisRound(newP2Picks);
+        if (currentP1Picks >= PICKS_PER_ROUND && newP2Picks >= PICKS_PER_ROUND) setTimeout(() => startBattle(), 500);
+        else if (newP2Picks < PICKS_PER_ROUND && currentP1Picks >= PICKS_PER_ROUND) setTimeout(() => botSelectOneItem(currentP1Picks, itemsToChooseFrom, gold, newP2Picks), 300);
+        else setCurrentTurn(1);
+        return;
+      }
+      const newGold = gold - selectedItem.cost;
+      setPlayer2Gold(newGold);
+      const existingSlotIdx = player2Slots.findIndex(s => s && s.name === selectedItem.name && (s.mergeLevel || 0) === 0);
+      const existingSideDeckIdx = player2SideDeck.findIndex(s => s && s.name === selectedItem.name && (s.mergeLevel || 0) === 0);
+      if (existingSlotIdx !== -1) { const n = [...player2Slots]; n[existingSlotIdx] = mergeItem(player2Slots[existingSlotIdx], selectedItem); setPlayer2Slots(n); }
+      else if (existingSideDeckIdx !== -1) { const n = [...player2SideDeck]; n[existingSideDeckIdx] = mergeItem(player2SideDeck[existingSideDeckIdx], selectedItem); setPlayer2SideDeck(n); }
+      else {
+        const emptySlot = player2Slots.findIndex(s => s === null);
+        if (emptySlot !== -1) { const n = [...player2Slots]; n[emptySlot] = { ...selectedItem, mergeLevel: 0 }; setPlayer2Slots(n); }
+        else { const e = player2SideDeck.findIndex(s => s === null); if (e !== -1) { const n = [...player2SideDeck]; n[e] = { ...selectedItem, mergeLevel: 0 }; setPlayer2SideDeck(n); } }
+      }
+      const updatedItems = itemsToChooseFrom.filter(i => i !== selectedItem);
+      setAvailableItems(updatedItems);
+      const newP2Picks = botPicks + 1; setPlayer2PicksThisRound(newP2Picks);
+      if (currentP1Picks >= PICKS_PER_ROUND && newP2Picks >= PICKS_PER_ROUND) setTimeout(() => startBattle(), 500);
+      else if (newP2Picks < PICKS_PER_ROUND && currentP1Picks >= PICKS_PER_ROUND) setTimeout(() => botSelectOneItem(currentP1Picks, updatedItems, newGold, newP2Picks), 300);
+      else setCurrentTurn(1);
+    }, 300);
+  };
+
+  const startBattle = () => {
+    setGameState('battle'); setSelectedSlot(null);
+    setPlayer1HP(BASE_HP); setPlayer2HP(BASE_HP);
+    setPlayer1Shield(0); setPlayer2Shield(0);
+    setPlayer1Debuffs({ poison: 0, burn: 0, bleed: 0 }); setPlayer2Debuffs({ poison: 0, burn: 0, bleed: 0 });
+    setBattleLog([]); setBattleTime(0); setItemCooldowns({ p1: [0, 0, 0], p2: [0, 0, 0] });
+    let logs = [];
+    player1Slots.forEach((item, idx) => {
+      if (!item) return;
+      if (item.name === "Dusk Shield") { setPlayer1Shield(prev => prev + 100); logs.push({ player: 1, text: `${item.name} grants 100 shield!`, type: 'buff' }); }
+      if (item.name === "Twilight's Edge") { const n = [...player1Slots]; n[idx] = { ...item, damage: item.damage + 7 }; setPlayer1Slots(n); logs.push({ player: 1, text: `${item.name} gains +7 damage!`, type: 'buff' }); }
+      if (item.name === "Trident") { setPlayer2Debuffs(prev => ({ ...prev, bleed: prev.bleed + 5 })); logs.push({ player: 1, text: `${item.name} applies 5 bleed!`, type: 'debuff' }); }
+    });
+    player2Slots.forEach((item, idx) => {
+      if (!item) return;
+      if (item.name === "Dusk Shield") { setPlayer2Shield(prev => prev + 100); logs.push({ player: 2, text: `${item.name} grants 100 shield!`, type: 'buff' }); }
+      if (item.name === "Twilight's Edge") { const n = [...player2Slots]; n[idx] = { ...item, damage: item.damage + 7 }; setPlayer2Slots(n); logs.push({ player: 2, text: `${item.name} gains +7 damage!`, type: 'buff' }); }
+      if (item.name === "Trident") { setPlayer1Debuffs(prev => ({ ...prev, bleed: prev.bleed + 5 })); logs.push({ player: 2, text: `${item.name} applies 5 bleed!`, type: 'debuff' }); }
+    });
+    setBattleLog(logs);
+  };
+
+  useEffect(() => {
+    if (gameState !== 'battle') return;
+    const interval = setInterval(() => {
+      setBattleTime(prev => { const newTime = prev + 0.1; processBattleTick(newTime); return newTime; });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [gameState, player1HP, player2HP, itemCooldowns, player1Slots, player2Slots]);
+
+  const processBattleTick = (time) => {
+    if (player1HP <= 0 || player2HP <= 0) { endRound(); return; }
+    if (Math.floor(time) > Math.floor(time - 0.1)) {
+      let logs = [];
+      if (player1Debuffs.poison > 0) { setPlayer1HP(prev => Math.max(0, prev - player1Debuffs.poison)); setPlayer1Debuffs(prev => ({ ...prev, poison: Math.max(0, prev.poison - 1) })); logs.push({ player: 1, text: `Poison deals ${player1Debuffs.poison} damage!`, type: 'poison' }); }
+      if (player1Debuffs.burn > 0) { setPlayer1HP(prev => Math.max(0, prev - player1Debuffs.burn * 2)); setPlayer1Debuffs(prev => ({ ...prev, burn: Math.max(0, prev.burn - 1) })); logs.push({ player: 1, text: `Burn deals ${player1Debuffs.burn * 2} damage!`, type: 'burn' }); }
+      if (player1Debuffs.bleed > 0) { setPlayer1HP(prev => Math.max(0, prev - player1Debuffs.bleed)); logs.push({ player: 1, text: `Bleed deals ${player1Debuffs.bleed} damage!`, type: 'bleed' }); }
+      if (player2Debuffs.poison > 0) { setPlayer2HP(prev => Math.max(0, prev - player2Debuffs.poison)); setPlayer2Debuffs(prev => ({ ...prev, poison: Math.max(0, prev.poison - 1) })); logs.push({ player: 2, text: `Poison deals ${player2Debuffs.poison} damage!`, type: 'poison' }); }
+      if (player2Debuffs.burn > 0) { setPlayer2HP(prev => Math.max(0, prev - player2Debuffs.burn * 2)); setPlayer2Debuffs(prev => ({ ...prev, burn: Math.max(0, prev.burn - 1) })); logs.push({ player: 2, text: `Burn deals ${player2Debuffs.burn * 2} damage!`, type: 'burn' }); }
+      if (player2Debuffs.bleed > 0) { setPlayer2HP(prev => Math.max(0, prev - player2Debuffs.bleed)); logs.push({ player: 2, text: `Bleed deals ${player2Debuffs.bleed} damage!`, type: 'bleed' }); }
+      if (time >= OVERTIME_START) {
+        setPlayer1HP(prev => Math.max(0, prev - OVERTIME_DAMAGE)); setPlayer2HP(prev => Math.max(0, prev - OVERTIME_DAMAGE));
+        logs.push({ player: 0, text: `⏰ OVERTIME! Both towers take ${OVERTIME_DAMAGE} damage!`, type: 'overtime' });
+      }
+      if (logs.length > 0) setBattleLog(prev => [...prev, ...logs].slice(-50));
+    }
+    const newCooldowns = { ...itemCooldowns };
+    let newLogs = [];
+    player1Slots.forEach((item, idx) => {
+      if (!item) return;
+      if (newCooldowns.p1[idx] <= 0) {
+        const result = triggerItem(item, 1, 2);
+        newLogs.push(...result.logs); newCooldowns.p1[idx] = item.cooldown;
+        setAnimations(prev => { const n = { ...prev }; n.p1[idx] = true; return n; });
+        setTimeout(() => setAnimations(prev => { const n = { ...prev }; n.p1[idx] = false; return n; }), 300);
+      } else newCooldowns.p1[idx] -= 0.1;
+    });
+    player2Slots.forEach((item, idx) => {
+      if (!item) return;
+      if (newCooldowns.p2[idx] <= 0) {
+        const result = triggerItem(item, 2, 1);
+        newLogs.push(...result.logs); newCooldowns.p2[idx] = item.cooldown;
+        setAnimations(prev => { const n = { ...prev }; n.p2[idx] = true; return n; });
+        setTimeout(() => setAnimations(prev => { const n = { ...prev }; n.p2[idx] = false; return n; }), 300);
+      } else newCooldowns.p2[idx] -= 0.1;
+    });
+    setItemCooldowns(newCooldowns);
+    if (newLogs.length > 0) setBattleLog(prev => [...prev, ...newLogs].slice(-50));
+  };
+
+  const triggerItem = (item, owner, target) => {
+    let logs = [], totalDamage = item.damage, multicast = 1 + (item.multicast || 0);
+    let isCrit = Math.random() * 100 < (item.critChance || 0);
+    if (isCrit) { totalDamage *= 2; logs.push({ player: owner, text: `${item.name} CRITS!`, type: 'crit' }); }
+    for (let i = 0; i < multicast; i++) {
+      if (totalDamage > 0) {
+        const setTargetHP = target === 1 ? setPlayer1HP : setPlayer2HP;
+        const targetShield = target === 1 ? player1Shield : player2Shield;
+        const setTargetShield = target === 1 ? setPlayer1Shield : setPlayer2Shield;
+        if (targetShield > 0) {
+          const shieldAbsorb = Math.min(targetShield, totalDamage);
+          setTargetShield(prev => Math.max(0, prev - shieldAbsorb));
+          const remainingDamage = totalDamage - shieldAbsorb;
+          if (remainingDamage > 0) setTargetHP(prev => Math.max(0, prev - remainingDamage));
+          logs.push({ player: owner, text: `${item.name} deals ${totalDamage} (${shieldAbsorb} blocked)`, type: 'damage' });
+        } else { setTargetHP(prev => Math.max(0, prev - totalDamage)); logs.push({ player: owner, text: `${item.name} deals ${totalDamage} damage!`, type: 'damage' }); }
+      }
+      const setTargetDebuffs = target === 1 ? setPlayer1Debuffs : setPlayer2Debuffs;
+      if (item.poison > 0) { setTargetDebuffs(prev => ({ ...prev, poison: prev.poison + item.poison })); logs.push({ player: owner, text: `Applied ${item.poison} poison!`, type: 'poison' }); }
+      if (item.burn > 0) { setTargetDebuffs(prev => ({ ...prev, burn: prev.burn + item.burn })); logs.push({ player: owner, text: `Applied ${item.burn} burn!`, type: 'burn' }); }
+      if (item.bleed > 0) { setTargetDebuffs(prev => ({ ...prev, bleed: prev.bleed + item.bleed })); logs.push({ player: owner, text: `Applied ${item.bleed} bleed!`, type: 'bleed' }); }
+    }
+    if (item.block > 0) { const setOwnerShield = owner === 1 ? setPlayer1Shield : setPlayer2Shield; setOwnerShield(prev => prev + item.block); logs.push({ player: owner, text: `${item.name} grants ${item.block} shield!`, type: 'shield' }); }
+    if (item.healing > 0) { const setOwnerHP = owner === 1 ? setPlayer1HP : setPlayer2HP; setOwnerHP(prev => Math.min(BASE_HP, prev + item.healing)); logs.push({ player: owner, text: `${item.name} heals for ${item.healing}!`, type: 'heal' }); }
+    return { logs };
+  };
+
+  const endRound = () => {
+    setGameState('roundEnd');
+    if (player1HP <= 0) {
+      setLastRoundLoser(1);
+      setPlayer2Wins(prev => { const n = prev + 1; if (n >= WINS_NEEDED) setTimeout(() => setGameState('gameOver'), 1500); return n; });
+    } else {
+      setLastRoundLoser(2);
+      setPlayer1Wins(prev => { const n = prev + 1; if (n >= WINS_NEEDED) setTimeout(() => setGameState('gameOver'), 1500); return n; });
+    }
+  };
+
+  const nextRound = () => {
+    if (player1Wins >= WINS_NEEDED || player2Wins >= WINS_NEEDED) { setGameState('gameOver'); return; }
+    battleStartedRef.current = false; setGameState('draft');
+    setPlayer1PicksThisRound(0); setPlayer2PicksThisRound(0); setRoundNumber(prev => prev + 1);
+    const newP1Gold = player1Gold + GOLD_PER_ROUND; const newP2Gold = player2Gold + GOLD_PER_ROUND;
+    setPlayer1Gold(newP1Gold); setPlayer1FinishedTurn(false); setPlayer2FinishedTurn(false); setTurnTimer(TURN_TIME_LIMIT);
+    if (gameMode === 'singlePool') {
+      setCurrentTurn(1);
+      const pool1 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      const pool2 = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      setPlayer1Pool(pool1);
+      const botResult = computeBotPicks(pool2, newP2Gold, player2Slots, player2SideDeck);
+      setPlayer2Gold(botResult.gold); setPlayer2Slots(botResult.slots); setPlayer2SideDeck(botResult.sideDeck); setPlayer2Pool(botResult.pool); setPlayer2FinishedTurn(true);
+    } else { 
+      setPlayer2Gold(newP2Gold); 
+      const pool = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 12).map(i => ({ ...i, mergeLevel: 0 }));
+      setAvailableItems(pool);
+      // Loser picks first in Same Pool mode
+      if (lastRoundLoser === 2) {
+        setCurrentTurn(2);
+        setTimeout(() => botSelectOneItem(0, pool, newP2Gold, 0), 300);
+      } else {
+        setCurrentTurn(1);
+      }
+    }
+  };
+
+  const resetGame = () => {
+    setGameState('menu'); setGameMode('samePool'); setPlayer1Wins(0); setPlayer2Wins(0);
+    setPlayer1Slots([null, null, null]); setPlayer2Slots([null, null, null]);
+    setPlayer1SideDeck([null, null, null]); setPlayer2SideDeck([null, null, null]);
+    setCurrentTurn(1); setPlayer1PicksThisRound(0); setPlayer2PicksThisRound(0);
+    setRoundNumber(1); setPlayer1Gold(STARTING_GOLD); setPlayer2Gold(STARTING_GOLD);
+    setPlayer1FinishedTurn(false); setPlayer2FinishedTurn(false); setTurnTimer(TURN_TIME_LIMIT);
+    setPlayer1Pool([]); setPlayer2Pool([]); setSelectedSlot(null); setLastRoundLoser(1);
+  };
+
+  const ItemCard = ({ item, onClick, small = false, animated = false, isMerging = false, showMergeHint = false, onRemove = null, showPrice = false, canAfford = true, isSelected = false, canMergeWith = false, isSwapTarget = false }) => {
+    const colors = PACK_COLORS[item.pack] || PACK_COLORS.Neutral;
+    const mergeLevel = item.mergeLevel || 0;
+    return (
+      <div onClick={canAfford ? onClick : undefined} onMouseEnter={() => setHoveredItem(item)} onMouseLeave={() => setHoveredItem(null)}
+        className={`relative cursor-pointer transition-all duration-200 bg-gradient-to-br ${colors.bg} ${colors.border} border-2
+          ${small ? 'w-20 h-24 rounded-lg' : 'w-32 h-40 rounded-xl'}
+          ${animated ? 'animate-pulse ring-4 ring-yellow-400 scale-110' : 'hover:scale-105 hover:shadow-xl'}
+          ${isMerging ? 'animate-bounce ring-4 ring-green-400 shadow-2xl shadow-green-500/50' : ''}
+          ${showMergeHint ? 'ring-2 ring-green-400 ring-opacity-50' : ''}
+          ${!canAfford && showPrice ? 'opacity-50 cursor-not-allowed grayscale' : ''}
+          ${isSelected ? 'ring-4 ring-amber-400 scale-105 shadow-xl shadow-amber-500/30' : ''}
+          ${isSwapTarget ? 'ring-2 ring-amber-300 ring-opacity-70' : ''}
+          ${canMergeWith ? 'ring-4 ring-green-400 scale-105 shadow-lg shadow-green-500/50' : ''}
+          flex flex-col items-center justify-center gap-1 p-2 backdrop-blur-sm ${colors.glow} ${animated || isMerging ? 'shadow-lg' : ''}`}>
+        {onRemove && !isSelected && <button onClick={(e) => { e.stopPropagation(); onRemove(); }} className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-red-400 shadow-lg z-10">✕</button>}
+        {isSelected && <div className="absolute -top-2 -right-2 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-white text-xs font-bold border-2 border-amber-300 shadow-lg z-10 animate-pulse">✓</div>}
+        {mergeLevel > 0 && <div className={`absolute -top-2 ${onRemove || isSelected ? '-left-2' : '-right-2'} w-6 h-6 bg-gradient-to-br from-yellow-400 to-amber-600 rounded-full flex items-center justify-center text-xs font-bold text-white border-2 border-yellow-300 shadow-lg`}>{mergeLevel}★</div>}
+        <div className={`${small ? 'text-2xl' : 'text-4xl'}`}>{item.icon}</div>
+        <div className={`${small ? 'text-xs' : 'text-sm'} font-bold text-white text-center leading-tight`}>{item.name}</div>
+        {!small && <div className="flex gap-2 text-xs mt-1">
+          {item.damage > 0 && <span className="text-red-400">⚔️{item.damage}</span>}
+          {item.block > 0 && <span className="text-blue-400">🛡️{item.block}</span>}
+          {item.healing > 0 && <span className="text-green-400">💚{item.healing}</span>}
+        </div>}
+        {showPrice && <div className={`text-xs font-bold ${canAfford ? 'text-yellow-400' : 'text-red-400'}`}>💰 {item.cost}</div>}
+        {!showPrice && <div className={`${small ? 'text-[8px]' : 'text-xs'} ${colors.text} font-medium`}>{item.pack}</div>}
+        {showMergeHint && <div className="absolute inset-0 bg-green-500/20 rounded-xl flex items-center justify-center"><span className="text-green-300 text-xs font-bold bg-green-900/80 px-2 py-1 rounded">MERGE!</span></div>}
+        {canMergeWith && <div className="absolute inset-0 bg-green-500/30 rounded-xl flex items-center justify-center"><span className="text-green-300 text-xs font-bold bg-green-900/90 px-2 py-1 rounded animate-pulse">🔄 MERGE!</span></div>}
+      </div>
+    );
+  };
+
+  const ItemTooltip = ({ item }) => {
+    if (!item) return null;
+    const colors = PACK_COLORS[item.pack] || PACK_COLORS.Neutral;
+    return (
+      <div className={`fixed bottom-4 left-1/2 -translate-x-1/2 z-50 bg-gradient-to-br ${colors.bg} ${colors.border} border-2 rounded-xl p-4 w-80 shadow-2xl backdrop-blur-md`}>
+        <div className="flex items-center gap-3 mb-2">
+          <span className="text-3xl">{item.icon}</span>
+          <div className="flex-1">
+            <h3 className="font-bold text-white text-lg">{item.name}</h3>
+            <span className={`text-sm ${colors.text}`}>{item.pack} • {item.tags}</span>
+          </div>
+          <div className="text-yellow-400 font-bold text-lg">💰 {item.cost}</div>
+        </div>
+        <div className="grid grid-cols-3 gap-2 text-sm mb-2">
+          {item.damage > 0 && <div className="text-red-400">⚔️ DMG: {item.damage}</div>}
+          {item.block > 0 && <div className="text-cyan-400">🛡️ Block: {item.block}</div>}
+          {item.healing > 0 && <div className="text-green-400">💚 Heal: {item.healing}</div>}
+          {item.critChance > 0 && <div className="text-yellow-400">💥 Crit: {item.critChance}%</div>}
+          {item.multicast > 0 && <div className="text-purple-400">✨ Multi: +{item.multicast}</div>}
+          {item.poison > 0 && <div className="text-emerald-400">☠️ Poison: {item.poison}</div>}
+          {item.burn > 0 && <div className="text-orange-400">🔥 Burn: {item.burn}</div>}
+          {item.bleed > 0 && <div className="text-red-300">🩸 Bleed: {item.bleed}</div>}
+        </div>
+        <div className="text-xs text-stone-400">⏱️ Cooldown: {item.cooldown}s</div>
+        {item.ability && <div className="mt-2 text-sm text-amber-300 italic border-t border-stone-600 pt-2">{item.ability}</div>}
+      </div>
+    );
+  };
+
+  // MENU
+  if (gameState === 'menu') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex flex-col items-center justify-center p-8">
+        <div className="text-center">
+          <h1 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-b from-amber-200 via-amber-400 to-amber-600 mb-2">⚔️ OAKEN TOWER ⚔️</h1>
+          <p className="text-xl text-stone-400 mb-2 font-semibold">VS BOT ARENA</p>
+          <p className="text-stone-500 mb-8">First to 3 wins takes the crown!</p>
+          <div className="flex gap-4 justify-center mb-8">
+            <button onClick={() => startGame('samePool')} className="px-8 py-4 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 text-white font-bold text-lg rounded-xl shadow-lg transition-all hover:scale-105 border-2 border-blue-400 w-56">
+              <div className="text-xl mb-1">🎯 Same Pool</div>
+              <div className="text-xs text-blue-200">Share items with bot</div>
+            </button>
+            <button onClick={() => startGame('singlePool')} className="px-8 py-4 bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-bold text-lg rounded-xl shadow-lg transition-all hover:scale-105 border-2 border-purple-400 w-56">
+              <div className="text-xl mb-1">🎲 Single Pool</div>
+              <div className="text-xs text-purple-200">Separate pools, counter-pick</div>
+            </button>
+          </div>
+          <div className="text-stone-500 text-sm max-w-lg mx-auto space-y-2">
+            <p>💰 Start with {STARTING_GOLD} gold, +{GOLD_PER_ROUND}/round</p>
+            <p>⭐ Merge same-star items (+80% stats)</p>
+            <p>⏰ Overtime after {OVERTIME_START}s: -{OVERTIME_DAMAGE} HP/sec</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // DRAFT
+  if (gameState === 'draft') {
+    const canMerge = (item) => player1Slots.some(s => s && s.name === item.name && (s.mergeLevel || 0) === 0) || player1SideDeck.some(s => s && s.name === item.name && (s.mergeLevel || 0) === 0);
+    const hasSpace = player1Slots.some(s => s === null) || player1SideDeck.some(s => s === null);
+    const canPurchase = (item) => (canMerge(item) || hasSpace) && player1Gold >= item.cost;
+    const isSamePool = gameMode === 'samePool';
+    const isPlayerTurn = isSamePool ? (currentTurn === 1 && player1PicksThisRound < PICKS_PER_ROUND) : !player1FinishedTurn;
+    const itemPool = isSamePool ? availableItems : player1Pool;
+
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 p-4">
+        <div className="max-w-6xl mx-auto">
+          <div className="text-center mb-4">
+            <div className="text-sm text-stone-500 mb-1">Round {roundNumber} • {isSamePool ? '🎯 Same Pool' : '🎲 Single Pool'}</div>
+            <h2 className="text-2xl font-bold text-amber-400 mb-1">
+              {isSamePool ? (currentTurn === 2 ? '🤖 Bot choosing...' : '👤 Your Turn!') : (player1FinishedTurn ? '⚔️ Starting...' : '👤 Choose Items!')}
+            </h2>
+            {!isSamePool && !player1FinishedTurn && <div className={`text-xl font-bold ${turnTimer <= 10 ? 'text-red-400 animate-pulse' : 'text-amber-400'}`}>⏱️ {turnTimer}s</div>}
+            <div className="flex justify-center gap-4 mt-2">
+              <div className="px-3 py-1 rounded bg-amber-600/30"><span className="text-amber-400 font-bold">💰 {player1Gold}</span></div>
+              <div className="px-3 py-1 rounded bg-stone-800"><span className="text-stone-400">Score: {player1Wins} - {player2Wins}</span></div>
+            </div>
+          </div>
+
+          <div className="flex justify-between mb-4">
+            {/* Player Tower */}
+            <div className="text-center">
+              <h3 className="text-amber-400 font-bold mb-2">👤 Your Tower</h3>
+              <div className="flex gap-2 mb-2">
+                {player1Slots.map((item, idx) => {
+                  const isSelected = selectedSlot?.type === 'tower' && selectedSlot?.index === idx;
+                  const isSwapTarget = selectedSlot && !(selectedSlot.type === 'tower' && selectedSlot.index === idx);
+                  const selectedItem = selectedSlot ? (selectedSlot.type === 'tower' ? player1Slots : player1SideDeck)[selectedSlot.index] : null;
+                  const canMergeWith = isSwapTarget && item && selectedItem && item.name === selectedItem.name && (item.mergeLevel || 0) === (selectedItem.mergeLevel || 0);
+                  return item ? (
+                    <div key={idx} onClick={() => handleSlotTap('tower', idx)}>
+                      <ItemCard item={item} isMerging={mergeAnimation === idx} onRemove={!isSelected ? () => removeItemFromSlot(idx) : null} isSelected={isSelected} isSwapTarget={isSwapTarget} canMergeWith={canMergeWith} />
+                    </div>
+                  ) : (
+                    <div key={idx} onClick={() => handleSlotTap('tower', idx)} className={`w-32 h-40 rounded-xl border-2 border-dashed flex items-center justify-center bg-stone-900/50 cursor-pointer hover:scale-105 ${isSwapTarget ? 'border-amber-400 bg-amber-900/30' : 'border-stone-600'}`}>
+                      <span className={isSwapTarget ? 'text-amber-400' : 'text-stone-500'}>{isSwapTarget ? '👆' : 'Empty'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="text-stone-500 text-xs mb-1">📦 Side Deck</div>
+              <div className="flex gap-1 justify-center">
+                {player1SideDeck.map((item, idx) => {
+                  const isSelected = selectedSlot?.type === 'sideDeck' && selectedSlot?.index === idx;
+                  const isSwapTarget = selectedSlot && !(selectedSlot.type === 'sideDeck' && selectedSlot.index === idx);
+                  const selectedItem = selectedSlot ? (selectedSlot.type === 'tower' ? player1Slots : player1SideDeck)[selectedSlot.index] : null;
+                  const canMergeWith = isSwapTarget && item && selectedItem && item.name === selectedItem.name && (item.mergeLevel || 0) === (selectedItem.mergeLevel || 0);
+                  return item ? (
+                    <div key={idx} onClick={() => handleSlotTap('sideDeck', idx)}>
+                      <ItemCard item={item} small isMerging={mergeAnimation === `side-${idx}`} onRemove={!isSelected ? () => removeItemFromSideDeck(idx) : null} isSelected={isSelected} isSwapTarget={isSwapTarget} canMergeWith={canMergeWith} />
+                    </div>
+                  ) : (
+                    <div key={idx} onClick={() => handleSlotTap('sideDeck', idx)} className={`w-20 h-24 rounded-lg border-2 border-dashed flex items-center justify-center bg-stone-900/30 cursor-pointer ${isSwapTarget ? 'border-amber-400' : 'border-stone-700'}`}>
+                      <span className="text-stone-600 text-xs">{isSwapTarget ? '👆' : '-'}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Bot Tower */}
+            <div className="text-center opacity-70">
+              <h3 className="text-stone-400 font-bold mb-2">🤖 Bot Tower</h3>
+              <div className="flex gap-2 mb-2">
+                {player2Slots.map((item, idx) => item ? <ItemCard key={idx} item={item} /> : <div key={idx} className="w-32 h-40 rounded-xl border-2 border-dashed border-stone-600 flex items-center justify-center bg-stone-900/50"><span className="text-stone-500">Empty</span></div>)}
+              </div>
+              <div className="text-stone-600 text-xs mb-1">📦 Side Deck</div>
+              <div className="flex gap-1 justify-center">
+                {player2SideDeck.map((item, idx) => item ? <ItemCard key={idx} item={item} small /> : <div key={idx} className="w-20 h-24 rounded-lg border-2 border-dashed border-stone-700 flex items-center justify-center bg-stone-900/30"><span className="text-stone-600 text-xs">-</span></div>)}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-stone-900/50 rounded-xl p-4 border border-stone-700">
+            <h3 className="text-lg font-bold text-stone-300 mb-2 text-center">{isSamePool ? 'Available Items' : 'Your Pool'}</h3>
+            <div className="grid grid-cols-4 md:grid-cols-6 gap-3 justify-items-center">
+              {itemPool.map((item, idx) => <ItemCard key={idx} item={item} onClick={() => isPlayerTurn && canPurchase(item) && playerSelectItem(item)} showMergeHint={canMerge(item) && player1Gold >= item.cost} showPrice={true} canAfford={canPurchase(item)} />)}
+            </div>
+            {isPlayerTurn && <div className="mt-4 text-center">
+              <button onClick={finishPlayerTurn} className={`px-6 py-2 font-bold rounded-xl transition-all hover:scale-105 ${isSamePool ? 'bg-stone-700 text-stone-200' : 'bg-green-700 text-white'}`}>
+                {isSamePool ? '⏭️ Finish Turn' : '✅ Start Battle'}
+              </button>
+            </div>}
+          </div>
+
+          {isSamePool && currentTurn === 2 && <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-40 pointer-events-none"><div className="bg-stone-800 rounded-xl p-8 text-center"><div className="text-4xl mb-4 animate-bounce">🤖</div><p className="text-stone-300 font-bold">Bot choosing...</p></div></div>}
+        </div>
+        <ItemTooltip item={hoveredItem} />
+      </div>
+    );
+  }
+
+  // BATTLE
+  if (gameState === 'battle' || gameState === 'roundEnd') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 p-4">
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-2">
+            <div className="text-sm text-stone-500">Round {roundNumber}</div>
+            <div className="flex justify-center gap-4 mb-1">
+              <span className="text-red-400 font-bold">👤 {player1Wins}</span>
+              <span className="text-amber-400 font-bold">⚔️ BATTLE ⚔️</span>
+              <span className="text-blue-400 font-bold">🤖 {player2Wins}</span>
+            </div>
+            {battleTime >= OVERTIME_START ? <div className="text-red-400 font-bold animate-pulse">⏰ OVERTIME!</div> : <div className="text-stone-400 text-sm">⏱️ {battleTime.toFixed(1)}s (Overtime in {Math.max(0, OVERTIME_START - Math.floor(battleTime))}s)</div>}
+          </div>
+
+          <div className="flex justify-between items-start gap-4 mb-2">
+            {/* Player */}
+            <div className="text-center">
+              <div className="text-amber-400 font-bold mb-1">👤 You</div>
+              <div className="flex gap-1 mb-1">{player1Slots.map((item, idx) => item ? <ItemCard key={idx} item={item} small animated={animations.p1[idx]} /> : <div key={idx} className="w-20 h-24 rounded-lg border border-stone-700 bg-stone-900/50" />)}</div>
+              <div className="w-40">
+                <div className="h-4 bg-stone-900 rounded-full overflow-hidden border border-stone-700">
+                  <div className="h-full bg-gradient-to-r from-red-600 to-red-400 transition-all" style={{ width: `${Math.max(0, (player1HP / BASE_HP) * 100)}%` }} />
+                </div>
+                <div className="text-xs text-white">{Math.max(0, Math.round(player1HP))}/{BASE_HP}</div>
+                {player1Shield > 0 && <div className="text-xs text-cyan-400">🛡️ {player1Shield}</div>}
+                <div className="flex gap-1 justify-center text-xs flex-wrap">
+                  {player1Debuffs.poison > 0 && <span className="text-green-400">☠️{player1Debuffs.poison}</span>}
+                  {player1Debuffs.burn > 0 && <span className="text-orange-400">🔥{player1Debuffs.burn}</span>}
+                  {player1Debuffs.bleed > 0 && <span className="text-red-400">🩸{player1Debuffs.bleed}</span>}
+                </div>
+              </div>
+            </div>
+
+            {/* Log */}
+            <div ref={logRef} className="flex-1 max-w-sm h-64 bg-stone-900/80 rounded-xl border border-stone-700 p-2 overflow-y-auto">
+              <div className="space-y-1 text-xs">
+                {battleLog.slice(-20).map((log, idx) => (
+                  <div key={idx} className={`px-1 py-0.5 rounded ${log.player === 0 ? 'text-center text-red-400 font-bold' : (log.player === 1 ? 'text-left text-red-300' : 'text-right text-blue-300')} ${log.type === 'overtime' ? 'animate-pulse' : ''}`}>
+                    {log.player === 0 ? '' : (log.player === 1 ? '👤 ' : '🤖 ')}{log.text}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Bot */}
+            <div className="text-center">
+              <div className="text-blue-400 font-bold mb-1">🤖 Bot</div>
+              <div className="flex gap-1 mb-1">{player2Slots.map((item, idx) => item ? <ItemCard key={idx} item={item} small animated={animations.p2[idx]} /> : <div key={idx} className="w-20 h-24 rounded-lg border border-stone-700 bg-stone-900/50" />)}</div>
+              <div className="w-40">
+                <div className="h-4 bg-stone-900 rounded-full overflow-hidden border border-stone-700">
+                  <div className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all" style={{ width: `${Math.max(0, (player2HP / BASE_HP) * 100)}%` }} />
+                </div>
+                <div className="text-xs text-white">{Math.max(0, Math.round(player2HP))}/{BASE_HP}</div>
+                {player2Shield > 0 && <div className="text-xs text-cyan-400">🛡️ {player2Shield}</div>}
+                <div className="flex gap-1 justify-center text-xs flex-wrap">
+                  {player2Debuffs.poison > 0 && <span className="text-green-400">☠️{player2Debuffs.poison}</span>}
+                  {player2Debuffs.burn > 0 && <span className="text-orange-400">🔥{player2Debuffs.burn}</span>}
+                  {player2Debuffs.bleed > 0 && <span className="text-red-400">🩸{player2Debuffs.bleed}</span>}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {gameState === 'roundEnd' && (
+            <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+              <div className="bg-stone-800 rounded-2xl p-8 text-center border-2 border-amber-500">
+                <h2 className="text-3xl font-bold text-amber-400 mb-4">{player1HP <= 0 ? '🤖 Bot Wins!' : '🎉 You Win!'}</h2>
+                <p className="text-stone-400 mb-4">Score: {player1Wins} - {player2Wins}</p>
+                {(player1Wins >= WINS_NEEDED || player2Wins >= WINS_NEEDED) ? (
+                  <div>
+                    <p className="text-xl text-amber-300 mb-4">🏆 {player1Wins >= WINS_NEEDED ? 'You are' : 'Bot is'} Champion!</p>
+                    <button onClick={resetGame} className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-stone-900 font-bold rounded-xl">Menu</button>
+                  </div>
+                ) : (
+                  <button onClick={nextRound} className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-stone-900 font-bold rounded-xl">Next Round →</button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+        <ItemTooltip item={hoveredItem} />
+      </div>
+    );
+  }
+
+  // GAME OVER
+  if (gameState === 'gameOver') {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-amber-400 mb-4">{player1Wins >= WINS_NEEDED ? '🏆 VICTORY!' : '💀 DEFEAT'}</h1>
+          <p className="text-stone-400 mb-8">Final: {player1Wins} - {player2Wins}</p>
+          <button onClick={resetGame} className="px-8 py-3 bg-amber-600 hover:bg-amber-500 text-stone-900 font-bold rounded-xl">Play Again</button>
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<OakenTowerPvP />);
+  </script>
+</body>
+</html>
