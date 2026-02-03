@@ -1,0 +1,2292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slot & Dungeon</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a0a2e 0%, #16213e 50%, #0f0f23 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'VT323', monospace;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px;
+        }
+        
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 200px;
+        }
+        
+        .stats-box, .inventory-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #4a9eff;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.3), inset 0 0 30px rgba(0, 0, 0, 0.5);
+        }
+        
+        .stats-box h3, .inventory-box h3 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #4a9eff;
+            margin-bottom: 12px;
+            text-shadow: 0 0 10px #4a9eff;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 18px;
+        }
+        
+        .stat-label { color: #888; }
+        .stat-value { color: #fff; font-weight: bold; }
+        .stat-value.hp { color: #ff6b6b; }
+        .stat-value.dmg { color: #ffa94d; }
+        .stat-value.armor { color: #74c0fc; }
+        .stat-value.crit { color: #f783ac; }
+        
+        .exp-bar-container {
+            margin-top: 10px;
+            background: #222;
+            border-radius: 4px;
+            height: 20px;
+            overflow: hidden;
+            border: 1px solid #444;
+        }
+        
+        .exp-bar {
+            height: 100%;
+            background: linear-gradient(90deg, #9775fa, #da77f2);
+            transition: width 0.3s ease;
+            box-shadow: 0 0 10px #9775fa;
+        }
+        
+        .exp-text {
+            font-size: 14px;
+            text-align: center;
+            margin-top: 5px;
+            color: #da77f2;
+        }
+        
+        .main-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .phase-indicator {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            color: #ffd43b;
+            text-shadow: 0 0 15px #ffd43b;
+            height: 30px;
+        }
+        
+        .grid-container {
+            position: relative;
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #ffd43b;
+            border-radius: 10px;
+            padding: 10px;
+            box-shadow: 0 0 30px rgba(255, 212, 59, 0.4), inset 0 0 50px rgba(0, 0, 0, 0.8);
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(7, 50px);
+            grid-template-rows: repeat(10, 50px);
+            gap: 2px;
+            background: #1a1a2e;
+        }
+        
+        .cell {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(145deg, #252540, #1a1a30);
+            border: 1px solid #333;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            position: relative;
+            transition: all 0.2s ease;
+        }
+        
+        .cell:hover {
+            border-color: #4a9eff;
+            box-shadow: 0 0 10px rgba(74, 158, 255, 0.5);
+        }
+        
+        .cell.enemy { background: linear-gradient(145deg, #3d1a1a, #2a1010); }
+        .cell.item { background: linear-gradient(145deg, #1a3d1a, #102a10); }
+        .cell.activating {
+            animation: pulse 0.5s ease-in-out;
+            box-shadow: 0 0 20px #ffd43b;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        
+        .cell .symbol {
+            font-size: 28px;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+        
+        .cell .hp-bar {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            right: 2px;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+        
+        .cell .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #ff6b6b, #fa5252);
+            transition: width 0.2s ease;
+        }
+        
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.95);
+            border: 2px solid #4a9eff;
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            font-size: 16px;
+            z-index: 500;
+            pointer-events: none;
+            white-space: nowrap;
+            box-shadow: 0 0 15px rgba(74, 158, 255, 0.4);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+        
+        .tooltip.visible {
+            opacity: 1;
+        }
+        
+        .tooltip .tooltip-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #ffd43b;
+            margin-bottom: 5px;
+        }
+        
+        .tooltip .tooltip-rarity {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 5px;
+        }
+        
+        .tooltip .tooltip-rarity.rare {
+            color: #da77f2;
+        }
+        
+        .tooltip .tooltip-desc {
+            color: #ccc;
+            max-width: 250px;
+            white-space: normal;
+        }
+        
+        .player {
+            position: absolute;
+            width: 46px;
+            height: 46px;
+            background: radial-gradient(circle at 30% 30%, #4dabf7, #228be6);
+            border: 3px solid #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            z-index: 100;
+            box-shadow: 0 0 20px rgba(77, 171, 247, 0.8);
+            transition: left 0.1s linear, top 0.1s linear;
+            pointer-events: none;
+        }
+        
+        .projectile {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            background: radial-gradient(circle, #ffd43b, #fab005);
+            border-radius: 50%;
+            box-shadow: 0 0 10px #ffd43b;
+            z-index: 90;
+            pointer-events: none;
+        }
+        
+        .enemy-projectile {
+            background: radial-gradient(circle, #ff6b6b, #e03131);
+            box-shadow: 0 0 10px #ff6b6b;
+        }
+        
+        .damage-number {
+            position: absolute;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: #ffd43b;
+            text-shadow: 0 0 5px #000, 2px 2px 0 #000;
+            z-index: 200;
+            pointer-events: none;
+            animation: floatUp 0.8s ease-out forwards;
+        }
+        
+        .door {
+            position: absolute;
+            width: 60px;
+            height: 70px;
+            top: -75px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            z-index: 50;
+            transition: all 0.3s ease;
+        }
+        
+        .door-frame {
+            width: 54px;
+            height: 64px;
+            background: linear-gradient(180deg, #5c4033 0%, #3d2817 100%);
+            border: 3px solid #2a1a0a;
+            border-radius: 8px 8px 0 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+        
+        .door-inner {
+            width: 40px;
+            height: 50px;
+            background: linear-gradient(180deg, #1a1a2e 0%, #0a0a15 100%);
+            border-radius: 5px 5px 0 0;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .door.closed .door-inner {
+            background: linear-gradient(180deg, #4a3728 0%, #2d1f14 100%);
+        }
+        
+        .door.closed .door-inner::before {
+            content: '🔒';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 20px;
+        }
+        
+        .door.open .door-inner::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: radial-gradient(ellipse at center, #4a9eff 0%, #1a3a5c 50%, #0a0a15 100%);
+            animation: portalGlow 2s ease-in-out infinite;
+        }
+        
+        .door.open .door-inner::after {
+            content: '✨';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 18px;
+            animation: sparkle 1s ease-in-out infinite;
+        }
+        
+        @keyframes portalGlow {
+            0%, 100% { opacity: 0.7; }
+            50% { opacity: 1; }
+        }
+        
+        @keyframes sparkle {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+        }
+        
+        .door-label {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 8px;
+            color: #888;
+            margin-top: 5px;
+            text-align: center;
+        }
+        
+        .door.open .door-label {
+            color: #4a9eff;
+            text-shadow: 0 0 10px #4a9eff;
+        }
+        
+        .door.open {
+            cursor: pointer;
+        }
+        
+        .door.open:hover .door-frame {
+            box-shadow: 0 0 20px rgba(74, 158, 255, 0.6);
+        }
+        
+        .damage-number.crit {
+            font-size: 16px;
+            color: #ff6b6b;
+        }
+        
+        .damage-number.heal {
+            color: #51cf66;
+        }
+        
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-30px); }
+        }
+        
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 220px;
+        }
+        
+        .floor-info {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #ffd43b;
+            border-radius: 8px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .floor-info h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 12px;
+            color: #ffd43b;
+            text-shadow: 0 0 10px #ffd43b;
+        }
+        
+        .floor-number {
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 20px #ffd43b;
+        }
+        
+        .controls-info {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #51cf66;
+            border-radius: 8px;
+            padding: 15px;
+            font-size: 16px;
+        }
+        
+        .controls-info h3 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #51cf66;
+            margin-bottom: 10px;
+        }
+        
+        .controls-info p {
+            margin-bottom: 5px;
+            color: #aaa;
+        }
+        
+        .log-box {
+            background: rgba(0, 0, 0, 0.6);
+            border: 2px solid #868e96;
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .log-box h3 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 10px;
+            color: #868e96;
+            margin-bottom: 10px;
+        }
+        
+        .log-entry {
+            font-size: 14px;
+            margin-bottom: 4px;
+            color: #aaa;
+        }
+        
+        .log-entry.damage { color: #ff6b6b; }
+        .log-entry.heal { color: #51cf66; }
+        .log-entry.level { color: #da77f2; }
+        .log-entry.item { color: #ffd43b; }
+        
+        /* Modal Overlay */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .modal-overlay.active {
+            display: flex;
+        }
+        
+        .modal {
+            background: linear-gradient(145deg, #1a1a2e, #252540);
+            border: 3px solid #4a9eff;
+            border-radius: 15px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(74, 158, 255, 0.5);
+            max-width: 500px;
+        }
+        
+        .modal h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 18px;
+            color: #4a9eff;
+            margin-bottom: 20px;
+            text-shadow: 0 0 15px #4a9eff;
+        }
+        
+        .modal p {
+            font-size: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .choices {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .choice-btn {
+            background: linear-gradient(145deg, #2a2a4a, #1a1a30);
+            border: 2px solid #4a9eff;
+            border-radius: 10px;
+            padding: 15px 25px;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            font-size: 22px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .choice-btn:hover {
+            background: linear-gradient(145deg, #3a3a5a, #2a2a40);
+            border-color: #ffd43b;
+            box-shadow: 0 0 20px rgba(255, 212, 59, 0.5);
+            transform: scale(1.02);
+        }
+        
+        .choice-btn .upgrade-name {
+            color: #ffd43b;
+            font-weight: bold;
+        }
+        
+        .choice-btn .upgrade-value {
+            color: #51cf66;
+        }
+        
+        .start-btn {
+            background: linear-gradient(145deg, #2f9e44, #1e7a34);
+            border: 2px solid #51cf66;
+            border-radius: 10px;
+            padding: 20px 40px;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-top: 20px;
+        }
+        
+        .start-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 30px rgba(81, 207, 102, 0.6);
+        }
+        
+        .enemy-choice {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .enemy-choice-btn {
+            background: linear-gradient(145deg, #3d1a1a, #2a1010);
+            border: 2px solid #ff6b6b;
+            border-radius: 10px;
+            padding: 15px;
+            color: #fff;
+            font-family: 'VT323', monospace;
+            font-size: 18px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 120px;
+        }
+        
+        .enemy-choice-btn:hover {
+            border-color: #ffd43b;
+            box-shadow: 0 0 15px rgba(255, 107, 107, 0.5);
+        }
+        
+        .enemy-choice-btn .emoji {
+            font-size: 32px;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        /* Inventory Items */
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px solid #333;
+            font-size: 16px;
+        }
+        
+        .inventory-item:last-child {
+            border-bottom: none;
+        }
+        
+        .inventory-item .name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .inventory-item .count {
+            color: #ffd43b;
+            font-weight: bold;
+        }
+        
+        .inventory-item.depleted {
+            opacity: 0.4;
+            text-decoration: line-through;
+        }
+        
+        .tab-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 10px;
+        }
+        
+        .tab-btn {
+            flex: 1;
+            padding: 8px;
+            background: #252540;
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: #888;
+            font-family: 'VT323', monospace;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .tab-btn.active {
+            background: #4a9eff;
+            border-color: #4a9eff;
+            color: #fff;
+        }
+        
+        .inventory-section {
+            display: none;
+            max-height: 250px;
+            overflow-y: auto;
+        }
+        
+        .inventory-section.active {
+            display: block;
+        }
+
+        /* Game Over */
+        .game-over-stats {
+            text-align: left;
+            margin: 20px 0;
+            padding: 15px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+        }
+        
+        .game-over-stats p {
+            margin: 8px 0;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <!-- Left Panel: Stats & Inventory -->
+        <div class="left-panel">
+            <div class="stats-box">
+                <h3>PLAYER STATS</h3>
+                <div class="stat-row">
+                    <span class="stat-label">HP</span>
+                    <span class="stat-value hp" id="stat-hp">60 / 60</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">DMG</span>
+                    <span class="stat-value dmg" id="stat-dmg">13</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Armor</span>
+                    <span class="stat-value armor" id="stat-armor">35</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Crit</span>
+                    <span class="stat-value crit" id="stat-crit">10%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Crit DMG</span>
+                    <span class="stat-value crit" id="stat-crit-dmg">200%</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Regen</span>
+                    <span class="stat-value" id="stat-regen">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Level</span>
+                    <span class="stat-value" id="stat-level">1</span>
+                </div>
+                <div class="exp-bar-container">
+                    <div class="exp-bar" id="exp-bar" style="width: 0%"></div>
+                </div>
+                <div class="exp-text" id="exp-text">0 / 5 EXP</div>
+            </div>
+            
+            <div class="inventory-box">
+                <h3>SYMBOL INVENTORY</h3>
+                <div class="tab-buttons">
+                    <button class="tab-btn active" onclick="showInventoryTab('items')">Items</button>
+                    <button class="tab-btn" onclick="showInventoryTab('enemies')">Enemies</button>
+                </div>
+                <div class="inventory-section active" id="inventory-items"></div>
+                <div class="inventory-section" id="inventory-enemies"></div>
+            </div>
+        </div>
+        
+        <!-- Main Game Area -->
+        <div class="main-area">
+            <div class="phase-indicator" id="phase-indicator">SLOT PHASE</div>
+            <div class="grid-container">
+                <div class="door closed" id="exit-door">
+                    <div class="door-frame">
+                        <div class="door-inner"></div>
+                    </div>
+                    <div class="door-label">EXIT</div>
+                </div>
+                <div class="grid" id="grid"></div>
+                <div class="player" id="player">🧙</div>
+                <div class="tooltip" id="tooltip">
+                    <div class="tooltip-title"></div>
+                    <div class="tooltip-rarity"></div>
+                    <div class="tooltip-desc"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Right Panel: Floor Info & Log -->
+        <div class="right-panel">
+            <div class="floor-info">
+                <h2>FLOOR</h2>
+                <div class="floor-number" id="floor-number">1</div>
+            </div>
+            
+            <div class="controls-info">
+                <h3>CONTROLS</h3>
+                <p>⌨️ WASD or Arrow Keys</p>
+                <p>⚔️ Auto-attack when still</p>
+                <p>📦 Walk over items to pickup</p>
+                <p>🚪 Enter door after clearing</p>
+            </div>
+            
+            <div class="log-box">
+                <h3>BATTLE LOG</h3>
+                <div id="log-content"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Level Up Modal -->
+    <div class="modal-overlay" id="levelup-modal">
+        <div class="modal">
+            <h2>⬆️ LEVEL UP!</h2>
+            <p>Choose an upgrade:</p>
+            <div class="choices" id="levelup-choices"></div>
+        </div>
+    </div>
+    
+    <!-- Enemy Choice Modal -->
+    <div class="modal-overlay" id="enemy-modal">
+        <div class="modal">
+            <h2>🎰 CHOOSE ENEMIES</h2>
+            <p>Select enemies for the next floor:</p>
+            <div class="enemy-choice" id="enemy-choices"></div>
+            <button class="start-btn" onclick="confirmEnemyChoice()">CONTINUE</button>
+        </div>
+    </div>
+    
+    <!-- Chest Modal -->
+    <div class="modal-overlay" id="chest-modal">
+        <div class="modal">
+            <h2>🧰 CHEST OPENED!</h2>
+            <p id="chest-text">Choose an item symbol to add:</p>
+            <div class="choices" id="chest-choices"></div>
+        </div>
+    </div>
+    
+    <!-- Game Over Modal -->
+    <div class="modal-overlay" id="gameover-modal">
+        <div class="modal">
+            <h2 id="gameover-title">💀 GAME OVER</h2>
+            <div class="game-over-stats" id="gameover-stats"></div>
+            <button class="start-btn" onclick="restartGame()">TRY AGAIN</button>
+        </div>
+    </div>
+    
+    <!-- Start Modal -->
+    <div class="modal-overlay active" id="start-modal">
+        <div class="modal">
+            <h2>🎰 SLOT & DUNGEON</h2>
+            <p>Combine slot machine luck with roguelike combat!</p>
+            <p style="font-size: 16px; color: #888; margin-top: 10px;">
+                Symbols spawn randomly each floor.<br>
+                Items activate first, then you fight!
+            </p>
+            <button class="start-btn" onclick="startGame()">START GAME</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== GAME CONSTANTS ====================
+        const GRID_WIDTH = 7;
+        const GRID_HEIGHT = 10;
+        const CELL_SIZE = 50;
+        const GAP = 2;
+        
+        // Player base stats
+        const BASE_PLAYER = {
+            hp: 60,
+            maxHp: 60,
+            armor: 35,
+            dmg: 13,
+            critChance: 10,
+            critDmg: 200,
+            regen: 0,
+            attackSpeed: 500, // ms between attacks
+            attackRange: 6,
+            moveSpeed: 4, // tiles per second
+            projectileSpeed: 8
+        };
+        
+        // Enemy definitions
+        const ENEMY_TYPES = {
+            slime: { name: 'Slime', emoji: '🟢', hp: 16, dmg: 3, armor: 10, type: 'melee', speed: 1, attackSpeed: 1000 },
+            snail: { name: 'Snail', emoji: '🐌', hp: 10, dmg: 3, armor: 10, type: 'ranged', speed: 0.8, attackSpeed: 2000 },
+            raccoon: { name: 'Raccoon', emoji: '🦝', hp: 17, dmg: 3, armor: 9, type: 'charger', speed: 1.2, attackSpeed: 1500 }
+        };
+        
+        // Item definitions
+        const ITEM_TYPES = {
+            cut: { name: 'Cut', emoji: '⚔️', rarity: 'common', trigger: 'floor_start', effect: 'horizontal_line', dmgMult: 0.75, desc: 'Deal 75% DMG to all enemies in a horizontal line' },
+            bomb: { name: 'Bomb', emoji: '💣', rarity: 'common', trigger: 'floor_start', effect: 'surrounding', dmgMult: 1.0, desc: 'Deal 100% DMG to all enemies in surrounding 8 tiles' },
+            powershot: { name: 'Powershot', emoji: '🎯', rarity: 'common', trigger: 'floor_start', effect: 'random_4', dmgMult: 0.5, desc: 'Deal 50% DMG to 4 random enemies' },
+            riceball: { name: 'Rice Ball', emoji: '🍙', rarity: 'common', trigger: 'pickup', effect: 'heal', healPct: 0.25, desc: 'Heal 25% of max HP when picked up' },
+            steak: { name: 'Steak', emoji: '🥩', rarity: 'rare', trigger: 'pickup', effect: 'heal', healPct: 0.35, desc: 'Heal 35% of max HP when picked up' },
+            luckyarrow: { name: 'Lucky Arrow', emoji: '🏹', rarity: 'rare', trigger: 'floor_start', effect: 'random_reactivate', dmgMult: 1.0, reactivateChance: 0.15, desc: 'Deal 100% DMG to a random enemy. 15% chance to reactivate' },
+            chest: { name: 'Chest', emoji: '🧰', rarity: 'common', trigger: 'pickup', effect: 'common_item', desc: 'Pick up to receive a random common item symbol' },
+            rarechest: { name: 'Rare Chest', emoji: '💎', rarity: 'rare', trigger: 'pickup', effect: 'rare_item', desc: 'Pick up to receive a random rare item symbol' }
+        };
+        
+        // Level up upgrades
+        const UPGRADES = [
+            { name: 'Max HP', stat: 'maxHp', value: 8, display: '+8 Max HP' },
+            { name: 'Crit Chance', stat: 'critChance', value: 4, display: '+4% Crit Chance' },
+            { name: 'Crit Damage', stat: 'critDmg', value: 15, display: '+15% Crit Damage' },
+            { name: 'HP Regen', stat: 'regen', value: 4, display: '+4 HP per floor' }
+        ];
+        
+        // ==================== GAME STATE ====================
+        let gameState = {
+            phase: 'start', // start, slot, activation, combat, levelup, enemy_choice, gameover
+            floor: 1,
+            player: { ...BASE_PLAYER },
+            level: 1,
+            exp: 0,
+            expRequired: 5,
+            grid: [],
+            enemies: [],
+            items: [],
+            projectiles: [],
+            selectedEnemies: [],
+            symbolInventory: {
+                items: {
+                    cut: 5, bomb: 5, powershot: 5, riceball: 5,
+                    steak: 5, luckyarrow: 5, chest: 5, rarechest: 5
+                },
+                enemies: { slime: 5, snail: 5, raccoon: 5 }
+            },
+            playerPos: { x: 3, y: 9 },
+            playerTargetPos: null,
+            isMoving: false,
+            lastAttackTime: 0,
+            pendingLevelUps: 0,
+            enemiesKilled: 0,
+            floorsCleared: 0,
+            doorOpen: false
+        };
+        
+        // ==================== DOM ELEMENTS ====================
+        const gridEl = document.getElementById('grid');
+        const playerEl = document.getElementById('player');
+        const phaseIndicator = document.getElementById('phase-indicator');
+        const exitDoor = document.getElementById('exit-door');
+        
+        // ==================== UTILITY FUNCTIONS ====================
+        function calculateDamage(rawDmg, armor) {
+            const damage = rawDmg * 100 / (100 + armor);
+            return Math.round(damage);
+        }
+        
+        function rollCrit(critChance, critDmg) {
+            if (Math.random() * 100 < critChance) {
+                return { isCrit: true, multiplier: critDmg / 100 };
+            }
+            return { isCrit: false, multiplier: 1 };
+        }
+        
+        function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+        
+        function shuffleArray(array) {
+            const arr = [...array];
+            for (let i = arr.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [arr[i], arr[j]] = [arr[j], arr[i]];
+            }
+            return arr;
+        }
+        
+        function distance(x1, y1, x2, y2) {
+            return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
+        }
+        
+        function log(message, type = '') {
+            const logContent = document.getElementById('log-content');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry ' + type;
+            entry.textContent = message;
+            logContent.insertBefore(entry, logContent.firstChild);
+            if (logContent.children.length > 50) {
+                logContent.removeChild(logContent.lastChild);
+            }
+        }
+        
+        // ==================== UI UPDATE FUNCTIONS ====================
+        function updateStats() {
+            document.getElementById('stat-hp').textContent = `${Math.max(0, gameState.player.hp)} / ${gameState.player.maxHp}`;
+            document.getElementById('stat-dmg').textContent = gameState.player.dmg;
+            document.getElementById('stat-armor').textContent = gameState.player.armor;
+            document.getElementById('stat-crit').textContent = `${gameState.player.critChance}%`;
+            document.getElementById('stat-crit-dmg').textContent = `${gameState.player.critDmg}%`;
+            document.getElementById('stat-regen').textContent = gameState.player.regen;
+            document.getElementById('stat-level').textContent = gameState.level;
+            
+            const expPct = (gameState.exp / gameState.expRequired) * 100;
+            document.getElementById('exp-bar').style.width = `${expPct}%`;
+            document.getElementById('exp-text').textContent = `${gameState.exp} / ${gameState.expRequired} EXP`;
+            
+            document.getElementById('floor-number').textContent = gameState.floor;
+        }
+        
+        function updateInventory() {
+            const itemsContainer = document.getElementById('inventory-items');
+            const enemiesContainer = document.getElementById('inventory-enemies');
+            
+            itemsContainer.innerHTML = '';
+            enemiesContainer.innerHTML = '';
+            
+            for (const [key, count] of Object.entries(gameState.symbolInventory.items)) {
+                const item = ITEM_TYPES[key];
+                const div = document.createElement('div');
+                div.className = 'inventory-item' + (count <= 0 ? ' depleted' : '');
+                div.innerHTML = `
+                    <span class="name">${item.emoji} ${item.name}</span>
+                    <span class="count">${count}</span>
+                `;
+                itemsContainer.appendChild(div);
+            }
+            
+            for (const [key, count] of Object.entries(gameState.symbolInventory.enemies)) {
+                const enemy = ENEMY_TYPES[key];
+                const div = document.createElement('div');
+                div.className = 'inventory-item' + (count <= 0 ? ' depleted' : '');
+                div.innerHTML = `
+                    <span class="name">${enemy.emoji} ${enemy.name}</span>
+                    <span class="count">${count}</span>
+                `;
+                enemiesContainer.appendChild(div);
+            }
+        }
+        
+        function showInventoryTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.inventory-section').forEach(sec => sec.classList.remove('active'));
+            
+            document.querySelector(`.tab-btn:nth-child(${tab === 'items' ? 1 : 2})`).classList.add('active');
+            document.getElementById(`inventory-${tab}`).classList.add('active');
+        }
+        
+        function setPhase(phase) {
+            gameState.phase = phase;
+            const phaseNames = {
+                slot: '🎰 SLOT PHASE',
+                activation: '⚡ ACTIVATION PHASE',
+                combat: '⚔️ COMBAT PHASE',
+                levelup: '⬆️ LEVEL UP',
+                enemy_choice: '🎯 CHOOSE ENEMIES',
+                gameover: '💀 GAME OVER'
+            };
+            phaseIndicator.textContent = phaseNames[phase] || phase.toUpperCase();
+        }
+        
+        // ==================== GRID FUNCTIONS ====================
+        function initGrid() {
+            gridEl.innerHTML = '';
+            gameState.grid = [];
+            
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                gameState.grid[y] = [];
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.dataset.x = x;
+                    cell.dataset.y = y;
+                    gridEl.appendChild(cell);
+                    gameState.grid[y][x] = { element: cell, content: null };
+                }
+            }
+        }
+        
+        function getCellElement(x, y) {
+            if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return null;
+            return gameState.grid[y][x].element;
+        }
+        
+        function setCellContent(x, y, content) {
+            x = Math.floor(x);
+            y = Math.floor(y);
+            if (x < 0 || x >= GRID_WIDTH || y < 0 || y >= GRID_HEIGHT) return;
+            if (!gameState.grid[y] || !gameState.grid[y][x]) return;
+            
+            gameState.grid[y][x].content = content;
+            const cell = gameState.grid[y][x].element;
+            
+            if (!content) {
+                cell.className = 'cell';
+                cell.innerHTML = '';
+                return;
+            }
+            
+            if (content.type === 'enemy') {
+                cell.className = 'cell enemy';
+                const hpPct = (content.hp / content.maxHp) * 100;
+                cell.innerHTML = `
+                    <span class="symbol">${content.emoji}</span>
+                    <div class="hp-bar"><div class="hp-bar-fill" style="width: ${hpPct}%"></div></div>
+                `;
+            } else if (content.type === 'item') {
+                cell.className = 'cell item';
+                cell.innerHTML = `<span class="symbol">${content.emoji}</span>`;
+            }
+        }
+        
+        function updateCellHP(x, y) {
+            if (!gameState.grid[y] || !gameState.grid[y][x]) return;
+            const content = gameState.grid[y][x].content;
+            if (content && content.type === 'enemy' && !content.isDead) {
+                const cell = gameState.grid[y][x].element;
+                const hpBar = cell.querySelector('.hp-bar-fill');
+                if (hpBar) {
+                    const hpPct = Math.max(0, (content.hp / content.maxHp) * 100);
+                    hpBar.style.width = `${hpPct}%`;
+                }
+            }
+        }
+        
+        // ==================== SPAWN FUNCTIONS ====================
+        function spawnSymbols() {
+            console.log('spawnSymbols called, current enemies:', gameState.enemies.length);
+            gameState.enemies = [];
+            gameState.items = [];
+            
+            // Get available positions (exclude bottom row for player)
+            const positions = [];
+            for (let y = 0; y < GRID_HEIGHT - 1; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    positions.push({ x, y });
+                }
+            }
+            
+            const shuffledPositions = shuffleArray(positions);
+            const totalSymbols = 35;
+            // Ratio 1.5:2 means enemies = 1.5/(1.5+2) = 43% of total
+            const enemyCount = Math.floor(totalSymbols * 1.5 / 3.5); // ~15 enemies
+            const itemCount = totalSymbols - enemyCount; // ~20 items
+            
+            // Get available symbols
+            const availableEnemies = [];
+            const availableItems = [];
+            
+            for (const [key, count] of Object.entries(gameState.symbolInventory.enemies)) {
+                if (count > 0) {
+                    availableEnemies.push({ key, count }); // No max limit for enemies
+                }
+            }
+            
+            for (const [key, count] of Object.entries(gameState.symbolInventory.items)) {
+                if (count > 0) {
+                    availableItems.push({ key, count: Math.min(count, 2) }); // Max 2 per item type
+                }
+            }
+            
+            // Spawn enemies (no max limit per type)
+            let spawnedEnemies = 0;
+            const enemySpawnCounts = {};
+            
+            while (spawnedEnemies < enemyCount && shuffledPositions.length > 0 && availableEnemies.length > 0) {
+                const pos = shuffledPositions.pop();
+                // Filter to enemies that still have inventory
+                const enemyPool = availableEnemies.filter(e => gameState.symbolInventory.enemies[e.key] > 0);
+                
+                if (enemyPool.length === 0) break;
+                
+                const chosen = enemyPool[getRandomInt(0, enemyPool.length - 1)];
+                const enemyType = ENEMY_TYPES[chosen.key];
+                const floorMultiplier = 1 + (gameState.floor - 1) * 0.1;
+                
+                const enemy = {
+                    type: 'enemy',
+                    key: chosen.key,
+                    name: enemyType.name,
+                    emoji: enemyType.emoji,
+                    hp: Math.floor(enemyType.hp * floorMultiplier),
+                    maxHp: Math.floor(enemyType.hp * floorMultiplier),
+                    dmg: Math.floor(enemyType.dmg * floorMultiplier),
+                    armor: enemyType.armor,
+                    behavior: enemyType.type,
+                    speed: enemyType.speed,
+                    attackSpeed: enemyType.attackSpeed,
+                    x: pos.x,
+                    y: pos.y,
+                    lastAttack: Date.now(),
+                    state: 'idle',
+                    chargeTarget: null,
+                    isDead: false
+                };
+                
+                gameState.enemies.push(enemy);
+                setCellContent(pos.x, pos.y, enemy);
+                
+                enemySpawnCounts[chosen.key] = (enemySpawnCounts[chosen.key] || 0) + 1;
+                gameState.symbolInventory.enemies[chosen.key]--;
+                spawnedEnemies++;
+            }
+            
+            // Spawn items (max 2 per type)
+            let spawnedItems = 0;
+            const itemSpawnCounts = {};
+            
+            while (spawnedItems < itemCount && shuffledPositions.length > 0 && availableItems.length > 0) {
+                const pos = shuffledPositions.pop();
+                const itemPool = availableItems.filter(i => (itemSpawnCounts[i.key] || 0) < 2 && gameState.symbolInventory.items[i.key] > 0);
+                
+                if (itemPool.length === 0) break;
+                
+                const chosen = itemPool[getRandomInt(0, itemPool.length - 1)];
+                const itemType = ITEM_TYPES[chosen.key];
+                
+                const item = {
+                    type: 'item',
+                    key: chosen.key,
+                    name: itemType.name,
+                    emoji: itemType.emoji,
+                    rarity: itemType.rarity,
+                    trigger: itemType.trigger,
+                    effect: itemType.effect,
+                    dmgMult: itemType.dmgMult,
+                    healPct: itemType.healPct,
+                    reactivateChance: itemType.reactivateChance,
+                    x: pos.x,
+                    y: pos.y
+                };
+                
+                gameState.items.push(item);
+                setCellContent(pos.x, pos.y, item);
+                
+                itemSpawnCounts[chosen.key] = (itemSpawnCounts[chosen.key] || 0) + 1;
+                gameState.symbolInventory.items[chosen.key]--;
+                spawnedItems++;
+            }
+            
+            updateInventory();
+            log(`Floor ${gameState.floor}: ${spawnedEnemies} enemies, ${spawnedItems} items spawned`, 'item');
+        }
+        
+        // ==================== ACTIVATION PHASE ====================
+        async function activationPhase() {
+            setPhase('activation');
+            
+            // Sort items: rare first, then by position (left-to-right, top-to-bottom)
+            const activationItems = gameState.items
+                .filter(item => item.trigger === 'floor_start')
+                .sort((a, b) => {
+                    if (a.rarity !== b.rarity) {
+                        return a.rarity === 'rare' ? -1 : 1;
+                    }
+                    if (a.y !== b.y) return a.y - b.y;
+                    return a.x - b.x;
+                });
+            
+            for (const item of activationItems) {
+                await activateItem(item);
+                await sleep(300);
+            }
+            
+            // Remove activated items from grid
+            for (const item of activationItems) {
+                const y = Math.floor(item.y);
+                const x = Math.floor(item.x);
+                if (gameState.grid[y] && gameState.grid[y][x]) {
+                    const content = gameState.grid[y][x].content;
+                    if (content && content.type === 'item' && content.trigger === 'floor_start') {
+                        setCellContent(x, y, null);
+                        const idx = gameState.items.indexOf(item);
+                        if (idx > -1) gameState.items.splice(idx, 1);
+                    }
+                }
+            }
+            
+            startCombat();
+        }
+        
+        async function activateItem(item) {
+            const cell = getCellElement(item.x, item.y);
+            if (cell) cell.classList.add('activating');
+            
+            log(`${item.emoji} ${item.name} activates!`, 'item');
+            
+            const baseDmg = Math.floor(gameState.player.dmg * (item.dmgMult || 1));
+            
+            switch (item.effect) {
+                case 'horizontal_line':
+                    // Deal damage to all enemies in the same row
+                    for (const enemy of [...gameState.enemies]) {
+                        if (enemy.y === item.y) {
+                            await dealDamageToEnemy(enemy, baseDmg);
+                        }
+                    }
+                    break;
+                    
+                case 'surrounding':
+                    // Deal damage to surrounding 8 squares
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dx = -1; dx <= 1; dx++) {
+                            if (dx === 0 && dy === 0) continue;
+                            const tx = item.x + dx;
+                            const ty = item.y + dy;
+                            const enemy = gameState.enemies.find(e => e.x === tx && e.y === ty);
+                            if (enemy) {
+                                await dealDamageToEnemy(enemy, baseDmg);
+                            }
+                        }
+                    }
+                    break;
+                    
+                case 'random_4':
+                    // Deal damage to 4 random enemies
+                    const targets = shuffleArray([...gameState.enemies]).slice(0, 4);
+                    for (const enemy of targets) {
+                        await dealDamageToEnemy(enemy, baseDmg);
+                    }
+                    break;
+                    
+                case 'random_reactivate':
+                    // Deal damage to 1 random enemy, 15% chance to reactivate
+                    let shouldContinue = true;
+                    while (shouldContinue && gameState.enemies.length > 0) {
+                        const target = gameState.enemies[getRandomInt(0, gameState.enemies.length - 1)];
+                        await dealDamageToEnemy(target, baseDmg);
+                        shouldContinue = Math.random() < item.reactivateChance;
+                        if (shouldContinue) {
+                            log(`${item.emoji} Lucky Arrow reactivates!`, 'item');
+                            await sleep(200);
+                        }
+                    }
+                    break;
+            }
+            
+            await sleep(300);
+            if (cell) cell.classList.remove('activating');
+        }
+        
+        async function dealDamageToEnemy(enemy, rawDmg) {
+            // Skip if enemy is already dead
+            if (enemy.isDead) return;
+            
+            const finalDmg = calculateDamage(rawDmg, enemy.armor);
+            enemy.hp -= finalDmg;
+            
+            showDamageNumber(enemy.x, enemy.y, finalDmg, false);
+            log(`${enemy.emoji} takes ${finalDmg} damage`, 'damage');
+            
+            updateCellHP(Math.floor(enemy.x), Math.floor(enemy.y));
+            
+            if (enemy.hp <= 0) {
+                killEnemy(enemy);
+            }
+        }
+        
+        function killEnemy(enemy) {
+            // Prevent double-killing
+            if (enemy.isDead) return;
+            
+            log(`${enemy.emoji} ${enemy.name} defeated!`, 'damage');
+            
+            // Mark as dead immediately
+            enemy.isDead = true;
+            
+            // Remove from enemies array
+            const idx = gameState.enemies.indexOf(enemy);
+            if (idx > -1) gameState.enemies.splice(idx, 1);
+            
+            // Clear ALL cells that might contain this enemy
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (gameState.grid[y] && gameState.grid[y][x]) {
+                        const content = gameState.grid[y][x].content;
+                        if (content === enemy) {
+                            gameState.grid[y][x].content = null;
+                            gameState.grid[y][x].element.className = 'cell';
+                            gameState.grid[y][x].element.innerHTML = '';
+                        }
+                    }
+                }
+            }
+            
+            gameState.enemiesKilled++;
+            gainExp(2);
+        }
+        
+        function gainExp(amount) {
+            gameState.exp += amount;
+            log(`+${amount} EXP`, 'level');
+            
+            while (gameState.exp >= gameState.expRequired) {
+                gameState.exp -= gameState.expRequired;
+                gameState.level++;
+                gameState.expRequired += 5;
+                gameState.pendingLevelUps++;
+                log(`Level Up! Now level ${gameState.level}`, 'level');
+            }
+            
+            updateStats();
+        }
+        
+        function showDamageNumber(x, y, amount, isCrit, isHeal = false) {
+            const gridRect = gridEl.getBoundingClientRect();
+            const cellX = x * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+            const cellY = y * (CELL_SIZE + GAP) + CELL_SIZE / 2;
+            
+            const dmgEl = document.createElement('div');
+            dmgEl.className = 'damage-number' + (isCrit ? ' crit' : '') + (isHeal ? ' heal' : '');
+            dmgEl.textContent = (isHeal ? '+' : '-') + amount;
+            dmgEl.style.left = (gridRect.left + cellX + 10) + 'px';
+            dmgEl.style.top = (gridRect.top + cellY) + 'px';
+            document.body.appendChild(dmgEl);
+            
+            setTimeout(() => dmgEl.remove(), 800);
+        }
+        
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // ==================== COMBAT PHASE ====================
+        function startCombat() {
+            console.log('=== STARTING COMBAT === Enemies:', gameState.enemies.length);
+            setPhase('combat');
+            
+            // Position player at bottom center
+            gameState.playerPos = { x: 3, y: 9 };
+            updatePlayerPosition();
+            playerEl.style.display = 'flex';
+            
+            gameState.lastAttackTime = 0;
+            lastTime = performance.now(); // Reset lastTime to prevent huge deltaTime on first frame
+            cleanupCounter = 0;
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        let lastTime = 0;
+        let cleanupCounter = 0;
+        
+        function gameLoop(timestamp) {
+            if (gameState.phase !== 'combat') return;
+            
+            // Cap deltaTime to prevent huge jumps (e.g., when tab is inactive)
+            let deltaTime = timestamp - lastTime;
+            if (deltaTime > 100) deltaTime = 16; // Cap at ~60fps frame time
+            lastTime = timestamp;
+            
+            updatePlayerMovement(deltaTime);
+            updateEnemies(deltaTime);
+            updateProjectiles(deltaTime);
+            playerAutoAttack(timestamp);
+            checkPickups();
+            checkDoorCollision();
+            
+            // Periodic cleanup every 60 frames
+            cleanupCounter++;
+            if (cleanupCounter >= 60) {
+                cleanupCounter = 0;
+                cleanupDeadEnemies();
+            }
+            
+            // Open door when all enemies are defeated
+            if (gameState.enemies.length === 0 && !gameState.doorOpen) {
+                cleanupDeadEnemies(); // Extra cleanup before opening door
+                console.log('Opening door - enemies array empty');
+                openDoor();
+            }
+            
+            // Debug: Log if we have enemies but door should be open
+            if (gameState.enemies.length > 0 && cleanupCounter === 0) {
+                const enemyInfo = gameState.enemies.map(e => `${e.name}(dead:${e.isDead},hp:${e.hp},x:${e.x.toFixed(1)},y:${e.y.toFixed(1)})`);
+                console.log('Enemies remaining:', gameState.enemies.length, enemyInfo.join(', '));
+            }
+            
+            if (gameState.player.hp <= 0) {
+                gameOver();
+                return;
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function cleanupDeadEnemies() {
+            // Remove any dead enemies, enemies with 0 or less HP, enemies out of bounds, or corrupted enemies
+            const beforeCount = gameState.enemies.length;
+            gameState.enemies = gameState.enemies.filter(e => {
+                if (!e) return false;
+                if (e.isDead === undefined || e.isDead === true) return false;
+                if (e.hp === undefined || e.hp <= 0) return false;
+                if (e.x === undefined || e.y === undefined) return false;
+                if (e.x < 0 || e.x >= GRID_WIDTH || e.y < 0 || e.y >= GRID_HEIGHT) return false;
+                return true;
+            });
+            const afterCount = gameState.enemies.length;
+            
+            if (beforeCount !== afterCount) {
+                console.log(`Cleanup removed ${beforeCount - afterCount} dead/invalid enemies`);
+            }
+            
+            // Clear any cells showing enemies that aren't in our array
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (gameState.grid[y] && gameState.grid[y][x]) {
+                        const content = gameState.grid[y][x].content;
+                        if (content && content.type === 'enemy') {
+                            // Check if this enemy is still alive in our array
+                            const isAlive = gameState.enemies.includes(content) && !content.isDead && content.hp > 0;
+                            if (!isAlive) {
+                                gameState.grid[y][x].content = null;
+                                gameState.grid[y][x].element.className = 'cell';
+                                gameState.grid[y][x].element.innerHTML = '';
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        function updatePlayerPosition() {
+            const px = gameState.playerPos.x * (CELL_SIZE + GAP) + 12;
+            const py = gameState.playerPos.y * (CELL_SIZE + GAP) + 12;
+            playerEl.style.left = px + 'px';
+            playerEl.style.top = py + 'px';
+        }
+        
+        function updatePlayerMovement(deltaTime) {
+            let dx = 0;
+            let dy = 0;
+            
+            if (keysPressed.up) dy -= 1;
+            if (keysPressed.down) dy += 1;
+            if (keysPressed.left) dx -= 1;
+            if (keysPressed.right) dx += 1;
+            
+            // Normalize diagonal movement
+            if (dx !== 0 && dy !== 0) {
+                const len = Math.sqrt(dx * dx + dy * dy);
+                dx /= len;
+                dy /= len;
+            }
+            
+            gameState.isMoving = (dx !== 0 || dy !== 0);
+            
+            if (gameState.isMoving) {
+                const moveAmount = (gameState.player.moveSpeed * deltaTime) / 1000;
+                gameState.playerPos.x += dx * moveAmount;
+                gameState.playerPos.y += dy * moveAmount;
+                
+                // Clamp to grid (allow slight overflow at top for door)
+                gameState.playerPos.x = Math.max(0, Math.min(GRID_WIDTH - 1, gameState.playerPos.x));
+                gameState.playerPos.y = Math.max(-0.2, Math.min(GRID_HEIGHT - 1, gameState.playerPos.y));
+            }
+            
+            updatePlayerPosition();
+        }
+        
+        function updateEnemies(deltaTime) {
+            for (const enemy of gameState.enemies) {
+                // Skip dead enemies
+                if (enemy.isDead) continue;
+                
+                const dx = gameState.playerPos.x - enemy.x;
+                const dy = gameState.playerPos.y - enemy.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                switch (enemy.behavior) {
+                    case 'melee': // Slime: hop toward player
+                        if (dist > 0.8) {
+                            const moveAmount = (enemy.speed * deltaTime) / 1000;
+                            const newX = enemy.x + (dx / dist) * moveAmount;
+                            const newY = enemy.y + (dy / dist) * moveAmount;
+                            
+                            if (!isPositionOccupied(newX, newY, enemy)) {
+                                updateEnemyPosition(enemy, newX, newY);
+                            }
+                        } else {
+                            // Contact damage
+                            if (Date.now() - enemy.lastAttack > enemy.attackSpeed) {
+                                const dmg = calculateDamage(enemy.dmg, gameState.player.armor);
+                                gameState.player.hp -= dmg;
+                                enemy.lastAttack = Date.now();
+                                showDamageNumber(Math.floor(gameState.playerPos.x), Math.floor(gameState.playerPos.y), dmg, false);
+                                log(`${enemy.emoji} hits you for ${dmg}!`, 'damage');
+                                updateStats();
+                            }
+                        }
+                        break;
+                        
+                    case 'ranged': // Snail: keep distance, shoot
+                        if (dist < 3) {
+                            // Retreat
+                            const moveAmount = (enemy.speed * deltaTime) / 1000;
+                            const newX = enemy.x - (dx / dist) * moveAmount;
+                            const newY = enemy.y - (dy / dist) * moveAmount;
+                            
+                            if (newX >= 0 && newX < GRID_WIDTH && newY >= 0 && newY < GRID_HEIGHT - 1) {
+                                if (!isPositionOccupied(newX, newY, enemy)) {
+                                    updateEnemyPosition(enemy, newX, newY);
+                                }
+                            }
+                        }
+                        
+                        // Shoot
+                        if (Date.now() - enemy.lastAttack > enemy.attackSpeed) {
+                            spawnEnemyProjectile(enemy);
+                            enemy.lastAttack = Date.now();
+                        }
+                        break;
+                        
+                    case 'charger': // Raccoon: charge at player
+                        if (enemy.state === 'idle' && dist < 4) {
+                            enemy.state = 'windup';
+                            enemy.chargeTarget = { x: gameState.playerPos.x, y: gameState.playerPos.y };
+                            enemy.windupStart = Date.now();
+                        } else if (enemy.state === 'windup') {
+                            if (Date.now() - enemy.windupStart > 500) {
+                                enemy.state = 'charging';
+                            }
+                        } else if (enemy.state === 'charging') {
+                            const cdx = enemy.chargeTarget.x - enemy.x;
+                            const cdy = enemy.chargeTarget.y - enemy.y;
+                            const cdist = Math.sqrt(cdx * cdx + cdy * cdy);
+                            
+                            if (cdist < 0.3) {
+                                enemy.state = 'stunned';
+                                enemy.stunStart = Date.now();
+                            } else {
+                                const chargeSpeed = enemy.speed * 3;
+                                const moveAmount = (chargeSpeed * deltaTime) / 1000;
+                                const newX = enemy.x + (cdx / cdist) * moveAmount;
+                                const newY = enemy.y + (cdy / cdist) * moveAmount;
+                                updateEnemyPosition(enemy, newX, newY);
+                                
+                                // Check collision with player during charge
+                                const playerDist = distance(newX, newY, gameState.playerPos.x, gameState.playerPos.y);
+                                if (playerDist < 0.8 && Date.now() - enemy.lastAttack > enemy.attackSpeed) {
+                                    const dmg = calculateDamage(enemy.dmg * 1.5, gameState.player.armor);
+                                    gameState.player.hp -= dmg;
+                                    enemy.lastAttack = Date.now();
+                                    showDamageNumber(Math.floor(gameState.playerPos.x), Math.floor(gameState.playerPos.y), dmg, false);
+                                    log(`${enemy.emoji} charge hits for ${dmg}!`, 'damage');
+                                    updateStats();
+                                    enemy.state = 'stunned';
+                                    enemy.stunStart = Date.now();
+                                }
+                            }
+                        } else if (enemy.state === 'stunned') {
+                            if (Date.now() - enemy.stunStart > 500) {
+                                enemy.state = 'idle';
+                            }
+                        } else {
+                            // Normal movement toward player
+                            if (dist > 4) {
+                                const moveAmount = (enemy.speed * deltaTime) / 1000;
+                                const newX = enemy.x + (dx / dist) * moveAmount;
+                                const newY = enemy.y + (dy / dist) * moveAmount;
+                                
+                                if (!isPositionOccupied(newX, newY, enemy)) {
+                                    updateEnemyPosition(enemy, newX, newY);
+                                }
+                            }
+                        }
+                        break;
+                }
+            }
+        }
+        
+        function isPositionOccupied(x, y, excludeEnemy) {
+            // Check for other enemies
+            for (const enemy of gameState.enemies) {
+                if (enemy === excludeEnemy) continue;
+                if (enemy.isDead) continue;
+                if (distance(x, y, enemy.x, enemy.y) < 0.8) return true;
+            }
+            // Check for items in this cell
+            const cellX = Math.floor(x);
+            const cellY = Math.floor(y);
+            if (cellX >= 0 && cellX < GRID_WIDTH && cellY >= 0 && cellY < GRID_HEIGHT) {
+                if (gameState.grid[cellY] && gameState.grid[cellY][cellX]) {
+                    const content = gameState.grid[cellY][cellX].content;
+                    if (content && content.type === 'item') return true;
+                }
+            }
+            return false;
+        }
+        
+        function updateEnemyPosition(enemy, newX, newY) {
+            // Don't update dead enemies
+            if (enemy.isDead) return;
+            
+            // Clamp new position to grid bounds
+            newX = Math.max(0, Math.min(GRID_WIDTH - 1, newX));
+            newY = Math.max(0, Math.min(GRID_HEIGHT - 1, newY));
+            
+            const oldCellX = Math.floor(enemy.x);
+            const oldCellY = Math.floor(enemy.y);
+            const newCellX = Math.floor(newX);
+            const newCellY = Math.floor(newY);
+            
+            enemy.x = newX;
+            enemy.y = newY;
+            
+            // Only update cells if moving to a different cell
+            if (oldCellX !== newCellX || oldCellY !== newCellY) {
+                // Clear old cell if it contains this enemy
+                if (oldCellY >= 0 && oldCellY < GRID_HEIGHT && oldCellX >= 0 && oldCellX < GRID_WIDTH) {
+                    if (gameState.grid[oldCellY] && gameState.grid[oldCellY][oldCellX]) {
+                        const oldContent = gameState.grid[oldCellY][oldCellX].content;
+                        if (oldContent === enemy) {
+                            setCellContent(oldCellX, oldCellY, null);
+                        }
+                    }
+                }
+                
+                // Place in new cell
+                if (newCellY >= 0 && newCellY < GRID_HEIGHT && newCellX >= 0 && newCellX < GRID_WIDTH) {
+                    if (gameState.grid[newCellY] && gameState.grid[newCellY][newCellX]) {
+                        const newContent = gameState.grid[newCellY][newCellX].content;
+                        // Only place if cell is empty (don't overwrite items)
+                        if (!newContent) {
+                            // Keep track of which cell the enemy is visually in
+                            enemy.visualCellX = newCellX;
+                            enemy.visualCellY = newCellY;
+                            setCellContent(newCellX, newCellY, enemy);
+                        }
+                    }
+                }
+            }
+        }
+        
+        function spawnEnemyProjectile(enemy) {
+            const proj = {
+                x: enemy.x,
+                y: enemy.y,
+                targetX: gameState.playerPos.x,
+                targetY: gameState.playerPos.y,
+                speed: 3,
+                dmg: enemy.dmg,
+                isEnemy: true
+            };
+            
+            const dx = proj.targetX - proj.x;
+            const dy = proj.targetY - proj.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            proj.vx = (dx / dist) * proj.speed;
+            proj.vy = (dy / dist) * proj.speed;
+            
+            gameState.projectiles.push(proj);
+            
+            const projEl = document.createElement('div');
+            projEl.className = 'projectile enemy-projectile';
+            proj.element = projEl;
+            document.querySelector('.grid-container').appendChild(projEl);
+            updateProjectilePosition(proj);
+        }
+        
+        function playerAutoAttack(timestamp) {
+            if (gameState.isMoving) return;
+            if (timestamp - gameState.lastAttackTime < gameState.player.attackSpeed) return;
+            if (gameState.enemies.length === 0) return;
+            
+            // Find nearest enemy
+            let nearest = null;
+            let nearestDist = Infinity;
+            
+            for (const enemy of gameState.enemies) {
+                const dist = distance(gameState.playerPos.x, gameState.playerPos.y, enemy.x, enemy.y);
+                if (dist < nearestDist && dist <= gameState.player.attackRange) {
+                    nearest = enemy;
+                    nearestDist = dist;
+                }
+            }
+            
+            if (nearest) {
+                spawnPlayerProjectile(nearest);
+                gameState.lastAttackTime = timestamp;
+            }
+        }
+        
+        function spawnPlayerProjectile(target) {
+            const proj = {
+                x: gameState.playerPos.x,
+                y: gameState.playerPos.y,
+                targetEnemy: target,
+                speed: gameState.player.projectileSpeed,
+                isEnemy: false
+            };
+            
+            gameState.projectiles.push(proj);
+            
+            const projEl = document.createElement('div');
+            projEl.className = 'projectile';
+            proj.element = projEl;
+            document.querySelector('.grid-container').appendChild(projEl);
+            updateProjectilePosition(proj);
+        }
+        
+        function updateProjectilePosition(proj) {
+            const px = proj.x * (CELL_SIZE + GAP) + CELL_SIZE / 2 - 6;
+            const py = proj.y * (CELL_SIZE + GAP) + CELL_SIZE / 2 - 6;
+            proj.element.style.left = px + 'px';
+            proj.element.style.top = py + 'px';
+        }
+        
+        function updateProjectiles(deltaTime) {
+            for (let i = gameState.projectiles.length - 1; i >= 0; i--) {
+                const proj = gameState.projectiles[i];
+                
+                if (proj.isEnemy) {
+                    // Enemy projectile with slight homing
+                    const dx = gameState.playerPos.x - proj.x;
+                    const dy = gameState.playerPos.y - proj.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Prevent division by zero
+                    if (dist < 0.1) {
+                        // Hit player
+                        const dmg = calculateDamage(proj.dmg, gameState.player.armor);
+                        gameState.player.hp -= dmg;
+                        showDamageNumber(Math.floor(gameState.playerPos.x), Math.floor(gameState.playerPos.y), dmg, false);
+                        log(`Projectile hits for ${dmg}!`, 'damage');
+                        updateStats();
+                        removeProjectile(proj, i);
+                        continue;
+                    }
+                    
+                    // Slight homing adjustment
+                    proj.vx += (dx / dist) * 0.05;
+                    proj.vy += (dy / dist) * 0.05;
+                    const speed = Math.sqrt(proj.vx * proj.vx + proj.vy * proj.vy);
+                    if (speed > 0) {
+                        proj.vx = (proj.vx / speed) * proj.speed;
+                        proj.vy = (proj.vy / speed) * proj.speed;
+                    }
+                    
+                    proj.x += proj.vx * deltaTime / 1000;
+                    proj.y += proj.vy * deltaTime / 1000;
+                    
+                    // Check hit player
+                    const playerDist = distance(proj.x, proj.y, gameState.playerPos.x, gameState.playerPos.y);
+                    if (playerDist < 0.5) {
+                        const dmg = calculateDamage(proj.dmg, gameState.player.armor);
+                        gameState.player.hp -= dmg;
+                        showDamageNumber(Math.floor(gameState.playerPos.x), Math.floor(gameState.playerPos.y), dmg, false);
+                        log(`Projectile hits for ${dmg}!`, 'damage');
+                        updateStats();
+                        removeProjectile(proj, i);
+                        continue;
+                    }
+                } else {
+                    // Player projectile
+                    // Remove if target is dead, invalid, or out of bounds
+                    if (!proj.targetEnemy || 
+                        proj.targetEnemy.hp <= 0 || 
+                        proj.targetEnemy.isDead ||
+                        proj.targetEnemy.x < 0 || proj.targetEnemy.x >= GRID_WIDTH ||
+                        proj.targetEnemy.y < 0 || proj.targetEnemy.y >= GRID_HEIGHT) {
+                        removeProjectile(proj, i);
+                        continue;
+                    }
+                    
+                    const dx = proj.targetEnemy.x - proj.x;
+                    const dy = proj.targetEnemy.y - proj.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    // Prevent division by zero
+                    if (dist < 0.1) {
+                        // We're close enough, hit the enemy
+                        const crit = rollCrit(gameState.player.critChance, gameState.player.critDmg);
+                        let dmg = calculateDamage(gameState.player.dmg * crit.multiplier, proj.targetEnemy.armor);
+                        
+                        proj.targetEnemy.hp -= dmg;
+                        showDamageNumber(Math.floor(proj.targetEnemy.x), Math.floor(proj.targetEnemy.y), dmg, crit.isCrit);
+                        log(`You hit ${proj.targetEnemy.emoji} for ${dmg}${crit.isCrit ? ' CRIT!' : ''}`, 'damage');
+                        
+                        updateCellHP(Math.floor(proj.targetEnemy.x), Math.floor(proj.targetEnemy.y));
+                        
+                        if (proj.targetEnemy.hp <= 0) {
+                            killEnemy(proj.targetEnemy);
+                        }
+                        
+                        removeProjectile(proj, i);
+                        continue;
+                    }
+                    
+                    const moveAmount = proj.speed * deltaTime / 1000;
+                    proj.x += (dx / dist) * moveAmount;
+                    proj.y += (dy / dist) * moveAmount;
+                    
+                    // Check hit enemy
+                    if (dist < 0.5) {
+                        const crit = rollCrit(gameState.player.critChance, gameState.player.critDmg);
+                        let dmg = calculateDamage(gameState.player.dmg * crit.multiplier, proj.targetEnemy.armor);
+                        
+                        proj.targetEnemy.hp -= dmg;
+                        showDamageNumber(Math.floor(proj.targetEnemy.x), Math.floor(proj.targetEnemy.y), dmg, crit.isCrit);
+                        log(`You hit ${proj.targetEnemy.emoji} for ${dmg}${crit.isCrit ? ' CRIT!' : ''}`, 'damage');
+                        
+                        updateCellHP(Math.floor(proj.targetEnemy.x), Math.floor(proj.targetEnemy.y));
+                        
+                        if (proj.targetEnemy.hp <= 0) {
+                            killEnemy(proj.targetEnemy);
+                        }
+                        
+                        removeProjectile(proj, i);
+                        continue;
+                    }
+                }
+                
+                // Remove if out of bounds
+                if (proj.x < -1 || proj.x > GRID_WIDTH + 1 || proj.y < -1 || proj.y > GRID_HEIGHT + 1) {
+                    removeProjectile(proj, i);
+                    continue;
+                }
+                
+                updateProjectilePosition(proj);
+            }
+        }
+        
+        function removeProjectile(proj, index) {
+            proj.element.remove();
+            gameState.projectiles.splice(index, 1);
+        }
+        
+        function checkPickups() {
+            const px = Math.floor(gameState.playerPos.x);
+            const py = Math.floor(gameState.playerPos.y);
+            
+            for (let i = gameState.items.length - 1; i >= 0; i--) {
+                const item = gameState.items[i];
+                if (item.trigger !== 'pickup') continue;
+                
+                const dist = distance(gameState.playerPos.x, gameState.playerPos.y, item.x, item.y);
+                if (dist < 0.8) {
+                    pickupItem(item, i);
+                }
+            }
+        }
+        
+        function pickupItem(item, index) {
+            log(`Picked up ${item.emoji} ${item.name}`, 'item');
+            
+            switch (item.effect) {
+                case 'heal':
+                    const healAmount = Math.floor(gameState.player.maxHp * item.healPct);
+                    gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + healAmount);
+                    showDamageNumber(Math.floor(gameState.playerPos.x), Math.floor(gameState.playerPos.y), healAmount, false, true);
+                    log(`Healed for ${healAmount} HP`, 'heal');
+                    updateStats();
+                    break;
+                    
+                case 'common_item':
+                    showChestModal('common');
+                    break;
+                    
+                case 'rare_item':
+                    showChestModal('rare');
+                    break;
+            }
+            
+            setCellContent(item.x, item.y, null);
+            gameState.items.splice(index, 1);
+        }
+        
+        function openDoor() {
+            gameState.doorOpen = true;
+            exitDoor.classList.remove('closed');
+            exitDoor.classList.add('open');
+            log('🚪 Door opened! Proceed to next floor.', 'level');
+        }
+        
+        function closeDoor() {
+            gameState.doorOpen = false;
+            exitDoor.classList.remove('open');
+            exitDoor.classList.add('closed');
+        }
+        
+        function checkDoorCollision() {
+            if (!gameState.doorOpen) return;
+            
+            // Debug log player position near door
+            if (gameState.playerPos.y <= 1) {
+                console.log('Player near top:', gameState.playerPos, 'Door open:', gameState.doorOpen);
+            }
+            
+            // Check if player is at top row (y close to 0) and near center (door position x: 2.5-4.5)
+            if (gameState.playerPos.y <= 0.3 && 
+                gameState.playerPos.x >= 2 && 
+                gameState.playerPos.x <= 5) {
+                console.log('Entering door!');
+                enterDoor();
+            }
+        }
+        
+        function enterDoor() {
+            log('Entering door...', 'level');
+            gameState.phase = 'transition';
+            endFloor();
+        }
+        
+        function showChestModal(rarity) {
+            gameState.phase = 'chest';
+            const modal = document.getElementById('chest-modal');
+            const choices = document.getElementById('chest-choices');
+            
+            document.getElementById('chest-text').textContent = 
+                rarity === 'rare' ? 'Choose a RARE item symbol:' : 'Choose an item symbol:';
+            
+            const available = Object.entries(ITEM_TYPES)
+                .filter(([key, item]) => {
+                    if (rarity === 'rare') return item.rarity === 'rare';
+                    return item.rarity === 'common';
+                });
+            
+            const selected = shuffleArray(available).slice(0, 3);
+            
+            choices.innerHTML = '';
+            for (const [key, item] of selected) {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerHTML = `${item.emoji} <span class="upgrade-name">${item.name}</span>`;
+                btn.onclick = () => {
+                    gameState.symbolInventory.items[key] += 2;
+                    log(`Added 2x ${item.emoji} ${item.name} to inventory`, 'item');
+                    updateInventory();
+                    modal.classList.remove('active');
+                    gameState.phase = 'combat';
+                    requestAnimationFrame(gameLoop);
+                };
+                choices.appendChild(btn);
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        // ==================== FLOOR END ====================
+        function endFloor() {
+            log(`Floor ${gameState.floor} cleared!`, 'level');
+            gameState.floorsCleared++;
+            
+            // Apply regen
+            if (gameState.player.regen > 0) {
+                gameState.player.hp = Math.min(gameState.player.maxHp, gameState.player.hp + gameState.player.regen);
+                log(`Regenerated ${gameState.player.regen} HP`, 'heal');
+            }
+            
+            // Clear projectiles
+            for (const proj of gameState.projectiles) {
+                proj.element.remove();
+            }
+            gameState.projectiles = [];
+            
+            // Check for pending level ups
+            if (gameState.pendingLevelUps > 0) {
+                showLevelUpModal();
+            } else {
+                showEnemyChoiceModal();
+            }
+        }
+        
+        function showLevelUpModal() {
+            setPhase('levelup');
+            const modal = document.getElementById('levelup-modal');
+            const choices = document.getElementById('levelup-choices');
+            
+            const selected = shuffleArray([...UPGRADES]).slice(0, 3);
+            
+            choices.innerHTML = '';
+            for (const upgrade of selected) {
+                const btn = document.createElement('button');
+                btn.className = 'choice-btn';
+                btn.innerHTML = `<span class="upgrade-name">${upgrade.name}</span>: <span class="upgrade-value">${upgrade.display}</span>`;
+                btn.onclick = () => {
+                    gameState.player[upgrade.stat] += upgrade.value;
+                    if (upgrade.stat === 'maxHp') {
+                        gameState.player.hp += upgrade.value;
+                    }
+                    log(`Upgraded: ${upgrade.display}`, 'level');
+                    updateStats();
+                    
+                    gameState.pendingLevelUps--;
+                    modal.classList.remove('active');
+                    
+                    if (gameState.pendingLevelUps > 0) {
+                        setTimeout(showLevelUpModal, 300);
+                    } else {
+                        showEnemyChoiceModal();
+                    }
+                };
+                choices.appendChild(btn);
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        function showEnemyChoiceModal() {
+            setPhase('enemy_choice');
+            const modal = document.getElementById('enemy-modal');
+            const choices = document.getElementById('enemy-choices');
+            
+            gameState.selectedEnemies = [];
+            
+            choices.innerHTML = '';
+            for (const [key, enemy] of Object.entries(ENEMY_TYPES)) {
+                const currentCount = gameState.symbolInventory.enemies[key];
+                const btn = document.createElement('button');
+                btn.className = 'enemy-choice-btn';
+                btn.innerHTML = `
+                    <span class="emoji">${enemy.emoji}</span>
+                    ${enemy.name}<br>
+                    <small>Stock: ${currentCount}</small>
+                `;
+                btn.onclick = () => {
+                    if (btn.classList.contains('selected')) {
+                        btn.classList.remove('selected');
+                        btn.style.borderColor = '#ff6b6b';
+                        const idx = gameState.selectedEnemies.indexOf(key);
+                        if (idx > -1) gameState.selectedEnemies.splice(idx, 1);
+                    } else {
+                        btn.classList.add('selected');
+                        btn.style.borderColor = '#51cf66';
+                        gameState.selectedEnemies.push(key);
+                    }
+                };
+                choices.appendChild(btn);
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        function confirmEnemyChoice() {
+            const modal = document.getElementById('enemy-modal');
+            
+            // Baseline replenishment for all enemy types each floor
+            for (const key of Object.keys(gameState.symbolInventory.enemies)) {
+                gameState.symbolInventory.enemies[key] += 3;
+            }
+            
+            // Bonus for selected enemies
+            for (const key of gameState.selectedEnemies) {
+                gameState.symbolInventory.enemies[key] += 5;
+            }
+            
+            if (gameState.selectedEnemies.length > 0) {
+                log(`Added extra enemies: ${gameState.selectedEnemies.join(', ')}`, 'item');
+            }
+            
+            updateInventory();
+            modal.classList.remove('active');
+            
+            // Next floor
+            gameState.floor++;
+            updateStats();
+            startFloor();
+        }
+        
+        // ==================== GAME OVER ====================
+        function gameOver() {
+            setPhase('gameover');
+            playerEl.style.display = 'none';
+            
+            const modal = document.getElementById('gameover-modal');
+            const stats = document.getElementById('gameover-stats');
+            
+            stats.innerHTML = `
+                <p>🏰 Floors Cleared: <strong>${gameState.floorsCleared}</strong></p>
+                <p>💀 Enemies Killed: <strong>${gameState.enemiesKilled}</strong></p>
+                <p>⬆️ Level Reached: <strong>${gameState.level}</strong></p>
+            `;
+            
+            modal.classList.add('active');
+        }
+        
+        function restartGame() {
+            document.getElementById('gameover-modal').classList.remove('active');
+            
+            // Reset game state
+            gameState = {
+                phase: 'start',
+                floor: 1,
+                player: { ...BASE_PLAYER },
+                level: 1,
+                exp: 0,
+                expRequired: 5,
+                grid: [],
+                enemies: [],
+                items: [],
+                projectiles: [],
+                selectedEnemies: [],
+                symbolInventory: {
+                    items: {
+                        cut: 5, bomb: 5, powershot: 5, riceball: 5,
+                        steak: 5, luckyarrow: 5, chest: 5, rarechest: 5
+                    },
+                    enemies: { slime: 5, snail: 5, raccoon: 5 }
+                },
+                playerPos: { x: 3, y: 9 },
+                playerTargetPos: null,
+                isMoving: false,
+                lastAttackTime: 0,
+                pendingLevelUps: 0,
+                enemiesKilled: 0,
+                floorsCleared: 0,
+                doorOpen: false
+            };
+            
+            closeDoor();
+            updateStats();
+            updateInventory();
+            startGame();
+        }
+        
+        // ==================== GAME START ====================
+        function startGame() {
+            document.getElementById('start-modal').classList.remove('active');
+            initGrid();
+            updateStats();
+            updateInventory();
+            startFloor();
+        }
+        
+        function startFloor() {
+            console.log('=== STARTING FLOOR', gameState.floor, '===');
+            setPhase('slot');
+            playerEl.style.display = 'none';
+            closeDoor();
+            
+            initGrid();
+            
+            // Slot machine animation delay
+            setTimeout(() => {
+                spawnSymbols();
+                setTimeout(() => {
+                    activationPhase();
+                }, 500);
+            }, 500);
+        }
+        
+        // ==================== INPUT HANDLING ====================
+        const keysPressed = {
+            up: false,
+            down: false,
+            left: false,
+            right: false
+        };
+        
+        document.addEventListener('keydown', (e) => {
+            if (gameState.phase !== 'combat') return;
+            
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    keysPressed.up = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    keysPressed.down = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    keysPressed.left = true;
+                    e.preventDefault();
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    keysPressed.right = true;
+                    e.preventDefault();
+                    break;
+            }
+        });
+        
+        document.addEventListener('keyup', (e) => {
+            switch (e.key) {
+                case 'ArrowUp':
+                case 'w':
+                case 'W':
+                    keysPressed.up = false;
+                    break;
+                case 'ArrowDown':
+                case 's':
+                case 'S':
+                    keysPressed.down = false;
+                    break;
+                case 'ArrowLeft':
+                case 'a':
+                case 'A':
+                    keysPressed.left = false;
+                    break;
+                case 'ArrowRight':
+                case 'd':
+                case 'D':
+                    keysPressed.right = false;
+                    break;
+            }
+        });
+        
+        // Tooltip handling
+        const tooltip = document.getElementById('tooltip');
+        const tooltipTitle = tooltip.querySelector('.tooltip-title');
+        const tooltipRarity = tooltip.querySelector('.tooltip-rarity');
+        const tooltipDesc = tooltip.querySelector('.tooltip-desc');
+        
+        gridEl.addEventListener('mousemove', (e) => {
+            const rect = gridEl.getBoundingClientRect();
+            const x = Math.floor((e.clientX - rect.left) / (CELL_SIZE + GAP));
+            const y = Math.floor((e.clientY - rect.top) / (CELL_SIZE + GAP));
+            
+            if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                if (gameState.grid[y] && gameState.grid[y][x]) {
+                    const content = gameState.grid[y][x].content;
+                    if (content && content.type === 'item') {
+                        // Get item type info for description
+                        const itemType = ITEM_TYPES[content.key];
+                        
+                        tooltipTitle.textContent = `${content.emoji} ${content.name}`;
+                        tooltipRarity.textContent = content.rarity.charAt(0).toUpperCase() + content.rarity.slice(1);
+                        tooltipRarity.className = 'tooltip-rarity' + (content.rarity === 'rare' ? ' rare' : '');
+                        tooltipDesc.textContent = itemType ? itemType.desc : '';
+                        
+                        // Position tooltip near cursor
+                        const tooltipX = e.clientX - rect.left + 15;
+                        const tooltipY = e.clientY - rect.top - 10;
+                        tooltip.style.left = tooltipX + 'px';
+                        tooltip.style.top = tooltipY + 'px';
+                        tooltip.classList.add('visible');
+                        return;
+                    }
+                }
+            }
+            
+            // Hide tooltip if not over an item
+            tooltip.classList.remove('visible');
+        });
+        
+        gridEl.addEventListener('mouseleave', () => {
+            tooltip.classList.remove('visible');
+        });
+        
+        // Initialize
+        initGrid();
+        updateStats();
+        updateInventory();
+    </script>
+</body>
+</html>
